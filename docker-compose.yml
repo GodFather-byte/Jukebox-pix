@@ -1,0 +1,14 @@
+services:
+  jukebox:
+    build: .
+    ports:
+      - "3000:3000"
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      TRUST_PROXY: "true"
+    volumes:
+      - ./database:/app/database
+      - ./musicas:/app/musicas
+      - ./backups:/app/backups
+    restart: unless-stopped

@@ -20,6 +20,9 @@ const musicasDir = caminho('MUSICAS_DIR', 'musicas');
 export const config = {
   producao: env.NODE_ENV === 'production',
   porta: num('PORT', 3000),
+  host: env.HOST || '0.0.0.0',
+  // Atrás de proxy reverso (Render, Railway, Nginx, Cloudflare): usa o IP/https reais do cliente.
+  confiarProxy: env.TRUST_PROXY === '1' || env.TRUST_PROXY === 'true',
   urlPublica: env.PUBLIC_URL || null,
   nomeLocal: env.NOME_LOCAL || 'Jukebox',
 
