@@ -1,0 +1,30 @@
+{
+  "name": "jukebox-pix",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Jukebox digital com pagamento Pix",
+  "scripts": {
+    "start": "node backend/server.js",
+    "dev": "nodemon --watch backend backend/server.js",
+    "dev:web": "npm --prefix frontend run dev",
+    "seed": "node backend/seed.js",
+    "build": "npm --prefix frontend run build",
+    "setup": "npm install && npm --prefix frontend install && npm run build && npm run seed"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "better-sqlite3": "^13.0.3",
+    "dotenv": "^18.0.5",
+    "express": "^5.2.1",
+    "multer": "^2.4.0",
+    "music-metadata": "^11.16.1",
+    "node-cron": "^4.6.0",
+    "qrcode": "^1.5.4"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
+  }
+}

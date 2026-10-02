@@ -1,0 +1,76 @@
+import { useCallback, useEffect, useState } from 'react';
+import Progresso from '../../components/Progresso.jsx';
+
+export default function PlayerAdmin({ chamar, versao }) {
+  const [estado, setEstado] = useState(null);
+  const [erro, setErro] = useState('');
+
+  const carregar = useCallback(() => chamar('/admin/player').then((e) => { setEstado(e); setErro(''); }).catch((e) => setErro(e.message)), [chamar]);
+
+  useEffect(() => {
+    carregar();
+    const id = setInterval(carregar, 5000);
+    return () => clearInterval(id);
+  }, [carregar, versao]);
+
+  const acao = (caminho, opcoes) => chamar(caminho, opcoes).then(carregar).catch((e) => setErro(e.message));
+
+  if (!estado) return erro ? <p className="aviso aviso-erro">{erro}</p> : <div className="estado"><span className="carregando" /></div>;
+  const atual = estado.agora_tocando;
+
+  return (
+    <>
+      <h2>Player</h2>
+      {estado.backend === 'sim' && <p className="aviso">🧪 Player simulado: nenhum áudio sai do computador. Instale o mpv ou o VLC para tocar de verdade.</p>}
+      {erro && <p className="aviso aviso-erro">{erro}</p>}
+
+      <div className="card fila-agora">
+        <span className="selo selo-ciano">{estado.pausado ? '⏸ FILA PAUSADA' : atual ? '▶ TOCANDO AGORA' : '⏹ PARADO'} · {estado.backend}</span>
+        {atual
+          ? <div className="fila-agora-info"><strong>{atual.musica.titulo}</strong><span>{atual.musica.artista} · {atual.quem}</span></div>
+          : <p className="vazio">Nada tocando.</p>}
+        <Progresso item={atual} />
+        <div className="admin-acoes">
+          <button className="btn btn-pequeno" onClick={() => acao('/admin/player/pular', { metodo: 'POST' })} disabled={!atual}>⏭ Pular</button>
+          {estado.pausado
+            ? <button className="btn btn-ciano btn-pequeno" onClick={() => acao('/admin/player/retomar', { metodo: 'POST' })}>▶ Retomar fila</button>
+            : <button className="btn btn-fantasma btn-pequeno" onClick={() => acao('/admin/player/pausar', { metodo: 'POST' })}>⏸ Pausar fila</button>}
+        </div>
+        <small>Pausar não corta a música atual: só impede que a próxima comece. Pular não reembolsa.</small>
+      </div>
+
+      <div className="card automatico">
+        <label className="interruptor">
+          <input type="checkbox" checked={estado.automatico.ativo}
+            onChange={(e) => acao('/admin/automatico', { metodo: 'PUT', corpo: { ativo: e.target.checked } })} />
+          <span className="interruptor-trilho" aria-hidden="true" />
+          <span>
+            <strong>🎲 Playlist automática</strong>
+            <small>Quando a fila esvazia, toca uma música aleatória do acervo para o salão não ficar em silêncio. Não conta no ranking nem no faturamento.</small>
+          </span>
+        </label>
+        <label className="interruptor" aria-disabled={!estado.automatico.ativo}>
+          <input type="checkbox" checked={estado.automatico.interrompe} disabled={!estado.automatico.ativo}
+            onChange={(e) => acao('/admin/automatico', { metodo: 'PUT', corpo: { interrompe: e.target.checked } })} />
+          <span className="interruptor-trilho" aria-hidden="true" />
+          <span>
+            <strong>Cortar a aleatória quando alguém pedir</strong>
+            <small>Desligado: o pedido toca quando a música aleatória terminar. Ligado: ela é cortada na hora e o pedido começa.</small>
+          </span>
+        </label>
+      </div>
+
+      <h2>Na fila ({estado.total_aguardando})</h2>
+      {estado.fila.length === 0 && <p className="vazio">Fila vazia.</p>}
+      <ol className="fila-lista">
+        {estado.fila.map((item, i) => (
+          <li key={item.id} className="fila-item">
+            <span className="fila-pos mono">{i + 1}</span>
+            <div className="fila-item-info"><strong>{item.musica.titulo}</strong><span>{item.musica.artista} · {item.quem}</span></div>
+            <button className="btn btn-perigo btn-pequeno" onClick={() => acao(`/admin/fila/${item.id}`, { metodo: 'DELETE' })}>Remover e reembolsar</button>
+          </li>
+        ))}
+      </ol>
+    </>
+  );
+}
