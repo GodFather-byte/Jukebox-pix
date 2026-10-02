@@ -24,7 +24,7 @@ export default function Fila({ limite }) {
             <div className="fila-agora-info">
               <strong>{atual.musica.titulo}</strong>
               <span>{atual.musica.artista}</span>
-              <small>{atual.automatica ? '🎲 Playlist automática' : `pedida por ${atual.minha ? 'você' : atual.quem}`}</small>
+              <small>{atual.automatica ? '🎲 Playlist automática' : atual.casa ? '🏠 Pedido da casa' : `pedida por ${atual.minha ? 'você' : atual.quem}`}</small>
             </div>
           </div>
           <Progresso item={atual} />

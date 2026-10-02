@@ -15,6 +15,7 @@ const paraCliente = (p) => ({
   session_id: p.session_id,
   valor: p.valor,
   creditos: p.creditos,
+  bonus: p.bonus,
   status: p.status,
   qr_code: p.qr_code,
   qr_imagem: p.qr_imagem,
@@ -41,6 +42,9 @@ export async function iniciar({ valor, sessionId }) {
     throw new ErroApi(429, 'Você já tem Pix aguardando pagamento. Conclua ou aguarde expirar.');
   }
 
+  // O bônus vale o que estava na tela quando o Pix foi gerado, mesmo que o dono mude as faixas depois.
+  const bonus = configuracoes.bonusPara(valor);
+
   const gateway = obterGateway();
   const id = novoId();
   const expiraEm = new Date(Date.now() + config.pagamento.pixExpiraMin * 60_000);
@@ -54,9 +58,9 @@ export async function iniciar({ valor, sessionId }) {
   const qrImagem = await QRCode.toDataURL(cobranca.qr_code, { margin: 2, width: 360, errorCorrectionLevel: 'M' });
 
   db.prepare(`
-    INSERT INTO pagamentos (id, session_id, valor, creditos, pix_id, provedor, qr_code, qr_imagem, status, criado_em, expira_em)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pendente', ?, ?)
-  `).run(id, sessao.id, valor, valor, cobranca.pix_id, gateway.nome, cobranca.qr_code, qrImagem, agora(), expiraEm.toISOString());
+    INSERT INTO pagamentos (id, session_id, valor, creditos, bonus, pix_id, provedor, qr_code, qr_imagem, status, criado_em, expira_em)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pendente', ?, ?)
+  `).run(id, sessao.id, valor, valor, bonus, cobranca.pix_id, gateway.nome, cobranca.qr_code, qrImagem, agora(), expiraEm.toISOString());
 
   return paraCliente(obterRegistro(id));
 }
@@ -92,7 +96,8 @@ const confirmarNoBanco = db.transaction((id) => {
   const pagamento = obterRegistro(id);
   if (!pagamento || pagamento.status === 'confirmado') return null; // idempotente: webhook repetido não credita de novo
   db.prepare("UPDATE pagamentos SET status = 'confirmado', confirmado_em = ? WHERE id = ?").run(agora(), id);
-  creditar(pagamento.session_id, pagamento.creditos);
+  // O bônus entra no saldo de cortesia: é custo da casa e não entra no faturamento dividido com a boate.
+  creditar(pagamento.session_id, pagamento.creditos, pagamento.bonus);
   return pagamento;
 });
 

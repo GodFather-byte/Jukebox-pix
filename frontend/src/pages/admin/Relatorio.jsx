@@ -148,6 +148,19 @@ export default function Relatorio({ chamar, baixarArquivo }) {
               </ol>
             </div>
           </div>
+
+          {dados.acervo_parado.total > 0 && (
+            <div className="card acervo-parado">
+              <span className="rotulo">💤 CDs sem nenhuma música tocada no período ({dados.acervo_parado.total})</span>
+              <p className="nota">Candidatos a trocar por algo que o público pede mais (veja a aba Sugestões). Já estavam no acervo antes do período.</p>
+              <ul className="ranking">
+                {dados.acervo_parado.cds.map((cd) => (
+                  <li key={`${cd.titulo}-${cd.artista}`}><span>{cd.titulo} <small>{cd.artista} · {cd.categoria}</small></span></li>
+                ))}
+              </ul>
+              {dados.acervo_parado.total > dados.acervo_parado.cds.length && <small>…e mais {dados.acervo_parado.total - dados.acervo_parado.cds.length}.</small>}
+            </div>
+          )}
         </>
       )}
     </div>

@@ -1,5 +1,41 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Progresso from '../../components/Progresso.jsx';
+import { useDebounce } from '../../hooks.js';
+import AutomaticaConfig from './AutomaticaConfig.jsx';
+
+// Volume mestre: grava depois de ~0,4 s sem mexer no controle. O mpv muda na hora; o VLC, na próxima faixa.
+function Volume({ chamar, estado }) {
+  const [volume, setVolume] = useState(estado.volume);
+  const [mensagem, setMensagem] = useState('');
+  const noServidor = useRef(estado.volume);
+  const adiado = useDebounce(volume, 400);
+
+  useEffect(() => {
+    if (estado.volume !== noServidor.current) { noServidor.current = estado.volume; setVolume(estado.volume); }
+  }, [estado.volume]);
+
+  useEffect(() => {
+    if (adiado === noServidor.current) return;
+    noServidor.current = adiado;
+    chamar('/admin/volume', { metodo: 'PUT', corpo: { volume: adiado } })
+      .then((r) => setMensagem(r.aplicado_ao_vivo ? 'Aplicado agora.' : 'Vale a partir da próxima música.'))
+      .catch((e) => setMensagem(e.message));
+  }, [adiado, chamar]);
+
+  return (
+    <div className="card volume">
+      <label className="volume-linha">
+        <strong>🔊 Volume</strong>
+        <input type="range" min="0" max="100" step="5" value={volume} onChange={(e) => setVolume(Number(e.target.value))} />
+        <b className="mono">{volume}%</b>
+      </label>
+      <small>
+        {estado.volume_ao_vivo ? 'Muda na hora, com a música tocando.' : estado.backend === 'sim' ? 'Player simulado: sem áudio.' : 'Este player só aplica o volume novo a partir da próxima música.'}
+        {mensagem && <> · {mensagem}</>}
+      </small>
+    </div>
+  );
+}
 
 export default function PlayerAdmin({ chamar, versao }) {
   const [estado, setEstado] = useState(null);
@@ -60,6 +96,9 @@ export default function PlayerAdmin({ chamar, versao }) {
         </label>
       </div>
 
+      <AutomaticaConfig chamar={chamar} config={estado.automatico} aoSalvar={carregar} />
+      <Volume chamar={chamar} estado={estado} />
+
       <h2>Na fila ({estado.total_aguardando})</h2>
       {estado.fila.length === 0 && <p className="vazio">Fila vazia.</p>}
       <ol className="fila-lista">
@@ -67,7 +106,7 @@ export default function PlayerAdmin({ chamar, versao }) {
           <li key={item.id} className="fila-item">
             <span className="fila-pos mono">{i + 1}</span>
             <div className="fila-item-info"><strong>{item.musica.titulo}</strong><span>{item.musica.artista} · {item.quem}</span></div>
-            <button className="btn btn-perigo btn-pequeno" onClick={() => acao(`/admin/fila/${item.id}`, { metodo: 'DELETE' })}>Remover e reembolsar</button>
+            <button className="btn btn-perigo btn-pequeno" onClick={() => acao(`/admin/fila/${item.id}`, { metodo: 'DELETE' })}>{item.casa ? 'Remover da fila' : 'Remover e reembolsar'}</button>
           </li>
         ))}
       </ol>

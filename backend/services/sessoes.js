@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import { db, agora, novoId, SESSAO_SISTEMA } from '../database.js';
+import { db, agora, novoId, ehSessaoInterna, SESSAO_CASA, SESSAO_SISTEMA } from '../database.js';
 import { config } from '../config.js';
 
 const novaExpiracao = () => new Date(Date.now() + config.sessaoTtlMin * 60_000).toISOString();
@@ -14,7 +14,7 @@ export function criarSessao() {
 // `saldo` é o total que o cliente pode gastar (pago + cortesia); `saldo_cortesia` é a parte grátis.
 // Créditos vencidos são zerados na leitura, sem depender do job rodar antes.
 export function obterSessao(id) {
-  if (!id || id === SESSAO_SISTEMA) return null;
+  if (!id || ehSessaoInterna(id)) return null;
   const sessao = db.prepare('SELECT * FROM sessoes WHERE id = ?').get(id);
   if (!sessao) return null;
 
@@ -84,6 +84,7 @@ export function limparSessoesVazias() {
 // Nome anônimo estável pra mostrar na fila sem expor o id da sessão (que vale como senha).
 export function rotulo(sessionId) {
   if (sessionId === SESSAO_SISTEMA) return 'Playlist automática';
+  if (sessionId === SESSAO_CASA) return 'Pedido da casa';
   const hash = crypto.createHash('sha1').update(String(sessionId)).digest('hex');
   return `Convidado ${hash.slice(0, 4).toUpperCase()}`;
 }

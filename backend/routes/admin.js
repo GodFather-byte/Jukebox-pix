@@ -10,9 +10,10 @@ import { criarToken, exigirAdmin, limitarLogin, senhaConfere } from '../middlewa
 import * as player from '../player.js';
 import * as backup from '../services/backup.js';
 import { apagarArquivo, capasDir, criarArtista, criarCd, EXT_AUDIO, EXT_IMAGEM } from '../services/biblioteca.js';
+import { buscar } from '../services/catalogo.js';
 import * as configuracoes from '../services/configuracoes.js';
 import * as cortesia from '../services/cortesia.js';
-import { listar, remover } from '../services/fila.js';
+import { adicionarDaCasa, listar, remover } from '../services/fila.js';
 import * as importacao from '../services/importacao.js';
 import * as relatorio from '../services/relatorio.js';
 import { obterSessao } from '../services/sessoes.js';
@@ -95,7 +96,7 @@ router.put('/artistas/:id', (req, res) => {
 router.get('/biblioteca', (req, res) => {
   const cds = db.prepare(`
     SELECT c.id, c.titulo, c.ano, c.capa, c.status, c.data_lancamento,
-           c.artista_id, c.categoria_id,
+           c.artista_id, c.categoria_id, c.oculto,
            a.nome AS artista, cat.nome AS categoria, cat.icone,
            COUNT(m.id) AS total_musicas, COALESCE(SUM(m.vezes_tocada), 0) AS vezes_tocadas
       FROM cds c
@@ -165,7 +166,7 @@ router.put('/cds/:id', (req, res) => {
   const cd = db.prepare('SELECT * FROM cds WHERE id = ?').get(req.params.id);
   if (!cd) throw new ErroApi(404, 'CD não encontrado');
 
-  const { titulo = cd.titulo, ano = cd.ano, categoria_id: categoriaId = cd.categoria_id, artista_id: artistaId = cd.artista_id, status = cd.status } = req.body ?? {};
+  const { titulo = cd.titulo, ano = cd.ano, categoria_id: categoriaId = cd.categoria_id, artista_id: artistaId = cd.artista_id, status = cd.status, oculto = cd.oculto } = req.body ?? {};
   if (!['novo', 'lancado'].includes(status)) throw new ErroApi(400, 'Status inválido');
   if (!db.prepare('SELECT 1 FROM categorias WHERE id = ?').get(categoriaId)) throw new ErroApi(400, 'Categoria inválida');
   if (!db.prepare('SELECT 1 FROM artistas WHERE id = ?').get(artistaId)) throw new ErroApi(400, 'Artista inválido');
@@ -177,11 +178,15 @@ router.put('/cds/:id', (req, res) => {
       : agora();
   }
 
-  db.prepare('UPDATE cds SET titulo = ?, ano = ?, categoria_id = ?, artista_id = ?, status = ?, data_lancamento = ? WHERE id = ?')
-    .run(titulo, ano ? Number(ano) : null, categoriaId, artistaId, status, dataLancamento, cd.id);
-  registrarLogCd(cd.id, titulo, 'editado', status !== cd.status ? `status: ${cd.status} → ${status}` : null);
+  db.prepare('UPDATE cds SET titulo = ?, ano = ?, categoria_id = ?, artista_id = ?, status = ?, data_lancamento = ?, oculto = ? WHERE id = ?')
+    .run(titulo, ano ? Number(ano) : null, categoriaId, artistaId, status, dataLancamento, oculto ? 1 : 0, cd.id);
+  const mudancas = [];
+  if (status !== cd.status) mudancas.push(`status: ${cd.status} → ${status}`);
+  if (Boolean(oculto) !== Boolean(cd.oculto)) mudancas.push(oculto ? 'ocultado do app' : 'voltou a aparecer no app');
+  registrarLogCd(cd.id, titulo, 'editado', mudancas.join('; ') || null);
 
   emitirTodos('lancamentos');
+  emitirTodos('top');
   res.json({ sucesso: true });
 });
 
@@ -266,11 +271,58 @@ router.delete('/fila/:id', (req, res) => {
   res.json({ sucesso: true });
 });
 
+// ---------- Console do dono: achar música, pôr na fila, ocultar ----------
+
+// Diferente da busca do cliente, esta também mostra o que está oculto (pra poder reexibir).
+router.get('/musicas', (req, res) => {
+  res.json({ musicas: buscar(String(req.query.q ?? '').slice(0, 80), null, { incluirOcultas: true }) });
+});
+
+// modo: 'fila' (no fim), 'seguir' (à frente de todos) ou 'agora' (corta a que está tocando).
+router.post('/fila/casa', (req, res) => {
+  const { musica_id: musicaId, modo = 'fila' } = req.body ?? {};
+  if (!['fila', 'seguir', 'agora'].includes(modo)) throw new ErroApi(400, 'Modo inválido');
+
+  adicionarDaCasa(musicaId, { aSeguir: modo !== 'fila' });
+  emitirTodos('fila');
+  if (modo !== 'agora' || !player.pular()) player.acordar();
+  res.status(201).json({ sucesso: true });
+});
+
+router.put('/musicas/:id/oculta', (req, res) => {
+  const musica = db.prepare('SELECT m.id, m.titulo, m.cd_id, c.titulo AS cd FROM musicas m JOIN cds c ON c.id = m.cd_id WHERE m.id = ?').get(req.params.id);
+  if (!musica) throw new ErroApi(404, 'Música não encontrada');
+
+  const oculta = req.body?.oculta ? 1 : 0;
+  db.prepare('UPDATE musicas SET oculta = ? WHERE id = ?').run(oculta, musica.id);
+  registrarLogCd(musica.cd_id, musica.cd, 'editado', `música "${musica.titulo}" ${oculta ? 'ocultada do app' : 'voltou a aparecer no app'}`);
+  emitirTodos('top');
+  emitirTodos('lancamentos');
+  res.json({ sucesso: true, oculta: Boolean(oculta) });
+});
+
+router.post('/acervo/ocultar-sem-arquivo', (req, res) => {
+  const ocultadas = sistema.ocultarSemArquivo();
+  if (ocultadas) {
+    emitirTodos('top');
+    emitirTodos('lancamentos');
+  }
+  res.json({ ocultadas });
+});
+
+// ---------- Volume ----------
+
+router.put('/volume', async (req, res) => {
+  const volume = configuracoes.salvarVolume(req.body?.volume);
+  const aoVivo = await player.aplicarVolume();
+  res.json({ volume, aplicado_ao_vivo: aoVivo });
+});
+
 // ---------- Playlist automática ----------
 
 router.put('/automatico', (req, res) => {
-  const { ativo, interrompe } = req.body ?? {};
-  const ajustes = configuracoes.salvarAutomatico({ ativo, interrompe });
+  const { ativo, interrompe, categorias, agenda } = req.body ?? {};
+  const ajustes = configuracoes.salvarAutomatico({ ativo, interrompe, categorias, agenda });
   if (ajustes.ativo) player.acordar();
   res.json(ajustes);
 });

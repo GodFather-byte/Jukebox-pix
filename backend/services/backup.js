@@ -13,24 +13,38 @@ function carimbo(data = new Date()) {
   return `${dia}_${doisDigitos(data.getHours())}${doisDigitos(data.getMinutes())}${doisDigitos(data.getSeconds())}`;
 }
 
-function descrever(nome) {
-  const estatisticas = fs.statSync(path.join(config.backupDir, nome));
+function descrever(nome, pasta) {
+  const estatisticas = fs.statSync(path.join(pasta, nome));
   return { arquivo: nome, bytes: estatisticas.size, criado_em: estatisticas.mtime.toISOString() };
 }
 
-export function listarBackups() {
-  if (!fs.existsSync(config.backupDir)) return [];
-  return fs.readdirSync(config.backupDir)
+export function listarBackups(pasta = config.backupDir) {
+  if (!pasta || !fs.existsSync(pasta)) return [];
+  return fs.readdirSync(pasta)
     .filter((nome) => PADRAO_NOME.test(nome))
     .sort()
     .reverse()
-    .map(descrever);
+    .map((nome) => descrever(nome, pasta));
 }
 
 // Mantém só os mais recentes (os nomes ordenam por data).
-function podarAntigos() {
-  for (const { arquivo } of listarBackups().slice(Math.max(1, config.backupManter))) {
-    fs.rmSync(path.join(config.backupDir, arquivo), { force: true });
+function podarAntigos(pasta) {
+  for (const { arquivo } of listarBackups(pasta).slice(Math.max(1, config.backupManter))) {
+    fs.rmSync(path.join(pasta, arquivo), { force: true });
+  }
+}
+
+// A cópia extra é "melhor esforço": pasta desconectada (pendrive solto, nuvem offline) não derruba o backup local.
+function copiarParaPastaExtra(nome) {
+  if (!config.backupCopiaDir) return null;
+  try {
+    fs.mkdirSync(config.backupCopiaDir, { recursive: true });
+    fs.copyFileSync(path.join(config.backupDir, nome), path.join(config.backupCopiaDir, nome));
+    podarAntigos(config.backupCopiaDir);
+    return { ok: true, pasta: config.backupCopiaDir };
+  } catch (erro) {
+    console.error('[backup] cópia extra falhou:', erro.message);
+    return { ok: false, pasta: config.backupCopiaDir, erro: erro.message };
   }
 }
 
@@ -41,14 +55,27 @@ export function fazerBackup() {
   if (fs.existsSync(path.join(config.backupDir, nome))) nome = `jukebox-${carimbo(new Date(Date.now() + 1000))}.db`;
 
   db.prepare('VACUUM INTO ?').run(path.join(config.backupDir, nome));
-  podarAntigos();
-  return descrever(nome);
+  podarAntigos(config.backupDir);
+  return { ...descrever(nome, config.backupDir), copia: copiarParaPastaExtra(nome) };
 }
 
 export function garantirBackupDoDia() {
   const hoje = `jukebox-${carimbo().slice(0, 10)}`;
   if (listarBackups().some((b) => b.arquivo.startsWith(hoje))) return null;
   return fazerBackup();
+}
+
+// Estado da cópia extra para o diagnóstico: está configurada? o último backup local já foi copiado?
+export function situacaoDaCopiaExtra() {
+  if (!config.backupCopiaDir) return null;
+  const ultimoLocal = listarBackups()[0]?.arquivo ?? null;
+  const copias = listarBackups(config.backupCopiaDir);
+  return {
+    pasta: config.backupCopiaDir,
+    acessivel: fs.existsSync(config.backupCopiaDir),
+    ultimo: copias[0] ?? null,
+    em_dia: ultimoLocal ? copias.some((c) => c.arquivo === ultimoLocal) : true,
+  };
 }
 
 // Só devolve caminho de arquivo que a gente mesmo criou: o nome vem da URL.

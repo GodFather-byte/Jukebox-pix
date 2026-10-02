@@ -51,7 +51,7 @@ export default function Tela() {
               <div>
                 <strong>{atual.musica.titulo}</strong>
                 <span>{atual.musica.artista}</span>
-                <small>{atual.automatica ? '🎲 Playlist automática' : `pedida por ${atual.quem}`}</small>
+                <small>{atual.automatica ? '🎲 Playlist automática' : atual.casa ? '🏠 Pedido da casa' : `pedida por ${atual.quem}`}</small>
               </div>
             </div>
           ) : (

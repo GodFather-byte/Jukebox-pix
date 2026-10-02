@@ -31,6 +31,9 @@ export default function Home() {
         {config.vendas_abertas
           ? <Link to="/pagar" className="btn btn-grande">PAGAR AGORA</Link>
           : <span className="btn btn-grande btn-desativado">VENDAS ENCERRADAS</span>}
+        {config.vendas_abertas && config.bonus.ativo && config.bonus.faixas.length > 0 && (
+          <small className="bonus-destaque">🎁 Bônus: {config.bonus.faixas.map((f) => `R$ ${f.valor} → +${f.bonus}`).join(' · ')}</small>
+        )}
       </section>
 
       {fila.agora_tocando && (

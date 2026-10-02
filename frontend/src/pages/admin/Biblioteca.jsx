@@ -21,6 +21,14 @@ function LinhaCd({ cd, categorias, artistas, chamar, aoMudar }) {
     } catch (e) { setErro(e.message); }
   };
 
+  // Oculto some do app e da playlist automática; dá pra mostrar de novo a qualquer momento.
+  const alternarOculto = async () => {
+    try {
+      await chamar(`/admin/cds/${cd.id}`, { metodo: 'PUT', corpo: { oculto: !cd.oculto } });
+      aoMudar();
+    } catch (e) { setErro(e.message); }
+  };
+
   const excluir = async () => {
     if (!window.confirm(`Excluir "${cd.titulo}" e todas as ${cd.total_musicas} músicas?\nMúsicas dele que estão na fila serão reembolsadas.`)) return;
     try {
@@ -39,9 +47,11 @@ function LinhaCd({ cd, categorias, artistas, chamar, aoMudar }) {
         <span className={`selo ${cd.status === 'novo' ? 'selo-rosa' : 'selo-ciano'}`}>
           {cd.status === 'novo' ? `🆕 Lançamento · ${textoDias(diasRestantes)}` : 'Na categoria'}
         </span>
+        {Boolean(cd.oculto) && <span className="selo selo-rosa">🙈 Oculto do app</span>}
       </div>
       <div className="admin-acoes">
         <button className="btn btn-fantasma btn-pequeno" onClick={editando ? () => setEditando(false) : abrir}>{editando ? 'Fechar' : 'Editar'}</button>
+        <button className="btn btn-fantasma btn-pequeno" onClick={alternarOculto}>{cd.oculto ? 'Mostrar' : 'Ocultar'}</button>
         <button className="btn btn-perigo btn-pequeno" onClick={excluir}>Excluir</button>
       </div>
 

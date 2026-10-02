@@ -9,6 +9,9 @@ export const novoId = () => crypto.randomUUID();
 
 // Sessão interna dona das músicas da playlist automática (não é de nenhum cliente).
 export const SESSAO_SISTEMA = 'sistema';
+// Sessão interna dona dos pedidos que o dono põe na fila pelo admin (grátis, fora do faturamento).
+export const SESSAO_CASA = 'casa';
+export const ehSessaoInterna = (id) => id === SESSAO_SISTEMA || id === SESSAO_CASA;
 
 export const normalizar = (texto) =>
   String(texto ?? '').normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
@@ -50,6 +53,7 @@ db.exec(`
     categoria_id TEXT NOT NULL REFERENCES categorias(id),
     capa TEXT,
     ano INTEGER,
+    oculto INTEGER NOT NULL DEFAULT 0,
     status TEXT NOT NULL DEFAULT 'novo' CHECK (status IN ('novo', 'lancado')),
     data_criacao TEXT NOT NULL,
     data_lancamento TEXT NOT NULL,
@@ -63,6 +67,7 @@ db.exec(`
     duracao INTEGER,
     creditos INTEGER NOT NULL DEFAULT 1,
     arquivo TEXT NOT NULL,
+    oculta INTEGER NOT NULL DEFAULT 0,
     vezes_tocada INTEGER NOT NULL DEFAULT 0,
     criado_em TEXT NOT NULL
   );
@@ -80,6 +85,7 @@ db.exec(`
     session_id TEXT NOT NULL REFERENCES sessoes(id),
     valor REAL NOT NULL,
     creditos INTEGER NOT NULL,
+    bonus INTEGER NOT NULL DEFAULT 0,
     pix_id TEXT,
     provedor TEXT NOT NULL,
     qr_code TEXT,
@@ -170,11 +176,16 @@ function garantirColuna(tabela, coluna, definicao) {
 garantirColuna('sessoes', 'saldo_cortesia', 'INTEGER NOT NULL DEFAULT 0');
 garantirColuna('fila', 'creditos_cortesia', 'INTEGER NOT NULL DEFAULT 0');
 garantirColuna('fila', 'prioridade', 'INTEGER NOT NULL DEFAULT 0');
+garantirColuna('cds', 'oculto', 'INTEGER NOT NULL DEFAULT 0');
+garantirColuna('musicas', 'oculta', 'INTEGER NOT NULL DEFAULT 0');
+garantirColuna('pagamentos', 'bonus', 'INTEGER NOT NULL DEFAULT 0');
 garantirColuna('historico_reproducao', 'cortesia', 'INTEGER NOT NULL DEFAULT 0');
 
 // Vencimento em 2999: nunca é zerada nem apagada pelas rotinas de limpeza.
-db.prepare("INSERT OR IGNORE INTO sessoes (id, saldo, criado_em, expira_em) VALUES (?, 0, ?, '2999-12-31T00:00:00.000Z')")
-  .run(SESSAO_SISTEMA, agora());
+for (const id of [SESSAO_SISTEMA, SESSAO_CASA]) {
+  db.prepare("INSERT OR IGNORE INTO sessoes (id, saldo, criado_em, expira_em) VALUES (?, 0, ?, '2999-12-31T00:00:00.000Z')")
+    .run(id, agora());
+}
 
 export function registrarLogCd(cdId, titulo, evento, detalhe = null) {
   db.prepare('INSERT INTO log_cds (cd_id, titulo, evento, detalhe, em) VALUES (?, ?, ?, ?, ?)')

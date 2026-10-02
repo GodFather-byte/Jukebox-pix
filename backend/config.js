@@ -29,6 +29,8 @@ export const config = {
   frontendDist: path.join(raiz, 'frontend', 'dist'),
   backupDir: caminho('BACKUP_DIR', 'backups'),
   backupManter: num('BACKUP_MANTER', 14), // quantos backups diários guardar
+  // Segunda cópia de cada backup (pasta do OneDrive/Google Drive, pendrive, HD externo). Opcional.
+  backupCopiaDir: env.BACKUP_COPIA_DIR ? path.resolve(raiz, env.BACKUP_COPIA_DIR) : null,
 
   // 1 crédito = R$ 1,00
   valoresPix: [5, 10, 20, 50],

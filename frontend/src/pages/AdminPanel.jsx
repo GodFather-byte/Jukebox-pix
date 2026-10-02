@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { api, baixar } from '../api.js';
 import Biblioteca from './admin/Biblioteca.jsx';
 import Cadastros from './admin/Cadastros.jsx';
+import Console from './admin/Console.jsx';
 import Cortesia from './admin/Cortesia.jsx';
 import Importar from './admin/Importar.jsx';
 import NovoCd from './admin/NovoCd.jsx';
@@ -21,6 +22,7 @@ const ABAS = [
   ['resumo', '📊 Resumo'],
   ['relatorio', '📈 Relatório'],
   ['player', '▶ Player'],
+  ['console', '🎛 Console'],
   ['biblioteca', '💿 Biblioteca'],
   ['novo', '➕ Novo CD'],
   ['importar', '📥 Importar'],
@@ -108,6 +110,7 @@ export default function AdminPanel() {
         {aba === 'resumo' && <Resumo chamar={chamar} />}
         {aba === 'relatorio' && <Relatorio chamar={chamar} baixarArquivo={baixarArquivo} />}
         {aba === 'player' && <PlayerAdmin chamar={chamar} versao={versao} />}
+        {aba === 'console' && <Console chamar={chamar} />}
         {aba === 'biblioteca' && <Biblioteca chamar={chamar} versao={versao} />}
         {aba === 'novo' && <NovoCd chamar={chamar} aoCriar={() => setAba('biblioteca')} />}
         {aba === 'importar' && <Importar chamar={chamar} aoImportar={() => setVersao((v) => v + 1)} />}

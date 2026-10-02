@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import Estado from '../components/Estado.jsx';
 import QRCode from '../components/QRCode.jsx';
 import { api, formatarReais } from '../api.js';
+import { bonusPara } from '../bonus.js';
 import { useSessao } from '../context/Sessao.jsx';
 import { useToast } from '../context/Toast.jsx';
 import { useAgora, useApi } from '../hooks.js';
@@ -108,6 +109,7 @@ export default function Pagar() {
         <div className="pagamento-icone">✅</div>
         <h1>Pagamento confirmado!</h1>
         <p><b className="mono">+{pagamento.creditos}</b> créditos adicionados</p>
+        {pagamento.bonus > 0 && <p className="bonus-destaque">🎁 + <b className="mono">{pagamento.bonus}</b> de bônus!</p>}
         <p>Saldo atual: <b className="mono">{saldo}</b></p>
         <button className="btn btn-grande" onClick={() => navigate('/')}>ESCOLHER MÚSICAS</button>
         <button className="btn btn-fantasma" onClick={novoPix}>Adicionar mais créditos</button>
@@ -121,6 +123,7 @@ export default function Pagar() {
       return (
         <section className="card pagamento-qr">
           <h1>Pague {formatarReais(pagamento.valor)} via Pix</h1>
+          {pagamento.bonus > 0 && <p className="bonus-destaque">🎁 Você ganha + <b className="mono">{pagamento.bonus}</b> créditos de bônus</p>}
           <p className="subtitulo">Abra o app do seu banco, escolha Pix → <b>Ler QR code</b> ou <b>Pix copia e cola</b>.</p>
           <QRCode imagem={pagamento.qr_imagem} texto={pagamento.qr_code} alt="QR code do Pix" />
           <p className="aguardando"><span className="carregando carregando-pequeno" /> Aguardando pagamento… expira em <b className="mono">{contagem(restante)}</b></p>
@@ -158,6 +161,7 @@ export default function Pagar() {
           <button key={v} className={`valor ${outro === '' && valor === v ? 'ativo' : ''}`} onClick={() => { setValor(v); setOutro(''); }}>
             <b className="mono">R$ {v}</b>
             <small>{v} músicas</small>
+            {bonusPara(v, config.bonus) > 0 && <span className="valor-bonus">🎁 +{bonusPara(v, config.bonus)} bônus</span>}
           </button>
         ))}
       </div>
@@ -173,6 +177,10 @@ export default function Pagar() {
           onChange={(e) => setOutro(e.target.value.replace(/\D/g, '').slice(0, 3))}
         />
       </label>
+
+      {valorValido && bonusPara(valorFinal, config.bonus) > 0 && (
+        <p className="bonus-destaque">🎁 Com R$ {valorFinal} você ganha + <b className="mono">{bonusPara(valorFinal, config.bonus)}</b> créditos de bônus</p>
+      )}
 
       {erro && <p className="aviso aviso-erro">{erro}</p>}
 

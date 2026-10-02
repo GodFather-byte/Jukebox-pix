@@ -12,7 +12,7 @@ export default function MiniPlayer() {
 
   return (
     <Link to="/fila" className="miniplayer" aria-label="Ver fila de músicas">
-      <span className="miniplayer-icone" aria-hidden="true">{atual.automatica ? '🎲' : '▶'}</span>
+      <span className="miniplayer-icone" aria-hidden="true">{atual.automatica ? '🎲' : atual.casa ? '🏠' : '▶'}</span>
       <div className="miniplayer-info">
         <strong>{atual.musica.titulo}</strong>
         <span>{atual.musica.artista}{fila.total_aguardando ? ` · +${fila.total_aguardando} na fila` : ''}</span>

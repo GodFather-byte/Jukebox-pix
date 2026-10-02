@@ -1,6 +1,7 @@
 import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { argumentosMpv, argumentosVlc, definirVolumeMpv, mpvSuportaIpc, novoCaminhoIpc } from './audio.js';
 import { config } from './config.js';
 import { SESSAO_SISTEMA } from './database.js';
 import { emitirSessao, emitirTodos } from './events.js';
@@ -39,7 +40,10 @@ function escolherBackend() {
   if (tipo === 'sim') return { tipo: 'sim' };
 
   if (tipo === 'auto' || tipo === 'mpv') {
-    if (comandoExiste(config.player.mpv)) return { tipo: 'mpv', comando: config.player.mpv };
+    if (comandoExiste(config.player.mpv)) {
+      const comando = config.player.mpv;
+      return { tipo: 'mpv', comando, ipc: mpvSuportaIpc(comando) };
+    }
   }
   if (tipo === 'auto' || tipo === 'vlc') {
     const vlc = localizarVlc();
@@ -54,9 +58,9 @@ function escolherBackend() {
   return { tipo: 'sim' };
 }
 
-function argumentos(arquivo) {
-  if (backend.tipo === 'mpv') return ['--no-video', '--no-terminal', '--really-quiet', '--audio-display=no', arquivo];
-  return ['--intf', 'dummy', '--no-video', '--play-and-exit', '--quiet', arquivo];
+function argumentos(arquivo, ipc) {
+  const volume = configuracoes.lerVolume();
+  return backend.tipo === 'mpv' ? argumentosMpv(arquivo, { volume, ipc }) : argumentosVlc(arquivo, { volume });
 }
 
 // Só toca arquivos dentro da pasta de músicas (o caminho vem do banco).
@@ -73,7 +77,7 @@ function tick() {
   let item = fila.proximo();
   // Fila vazia: se o modo automático estiver ligado, sorteia uma música pra não deixar o salão em silêncio.
   if (!item && Date.now() >= automaticoLivreEm && configuracoes.automaticoAtivo()) {
-    item = fila.criarAutomatico(recentes);
+    item = fila.criarAutomatico(recentes, configuracoes.categoriasDaAutomatica());
   }
   if (item) tocar(item);
 }
@@ -101,7 +105,9 @@ function tocar(item) {
     return;
   }
 
-  const proc = spawn(backend.comando, argumentos(arquivo), { stdio: 'ignore', windowsHide: true });
+  // O mpv recebe um canal de controle pra o admin mudar o volume com a música tocando.
+  atual.ipc = backend.tipo === 'mpv' && backend.ipc ? novoCaminhoIpc() : null;
+  const proc = spawn(backend.comando, argumentos(arquivo, atual.ipc), { stdio: 'ignore', windowsHide: true });
   atual.proc = proc;
   let encerrado = false;
   const fim = (ok) => {
@@ -148,6 +154,12 @@ export function parar() {
   atual?.proc?.kill();
 }
 
+// Aplica o volume gravado à música em andamento (só o mpv aceita mudança ao vivo; o resto vale na próxima faixa).
+export async function aplicarVolume() {
+  if (!atual?.ipc) return false;
+  return definirVolumeMpv(atual.ipc, configuracoes.lerVolume());
+}
+
 // Chamado quando alguém entra na fila. Se está tocando uma aleatória e o dono pediu pra cortá-la,
 // pula agora; senão o pedido toca assim que a faixa atual terminar.
 export function acordar() {
@@ -184,4 +196,6 @@ export const estado = () => ({
   pausado,
   tocando: Boolean(atual),
   automatico: configuracoes.lerAutomatico(),
+  volume: configuracoes.lerVolume(),
+  volume_ao_vivo: Boolean(backend?.ipc),
 });

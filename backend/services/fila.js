@@ -1,6 +1,7 @@
-import { db, agora, novoId, SESSAO_SISTEMA } from '../database.js';
+import { db, agora, novoId, ehSessaoInterna, SESSAO_CASA, SESSAO_SISTEMA } from '../database.js';
 import { config } from '../config.js';
 import { ErroApi } from '../erros.js';
+import { VISIVEL } from './catalogo.js';
 import * as configuracoes from './configuracoes.js';
 import { creditar, debitar, obterSessao, rotulo } from './sessoes.js';
 
@@ -21,7 +22,10 @@ const contar = (sql, ...parametros) => db.prepare(sql).get(...parametros).total;
 export const adicionar = db.transaction((sessionId, musicaId, { prioridade = false } = {}) => {
   if (!sessionId || !obterSessao(sessionId)) throw new ErroApi(404, 'Sessão não encontrada');
 
-  const musica = db.prepare('SELECT id, creditos FROM musicas WHERE id = ?').get(musicaId);
+  // Música ou CD ocultos pelo dono não podem mais ser pedidos.
+  const musica = db.prepare(`
+    SELECT m.id, m.creditos FROM musicas m JOIN cds c ON c.id = m.cd_id WHERE m.id = ? AND ${VISIVEL}
+  `).get(musicaId);
   if (!musica) throw new ErroApi(404, 'Música não encontrada');
 
   const regras = configuracoes.lerRegras();
@@ -81,6 +85,7 @@ function paraCliente(item, sessionId, esperaSegundos) {
     quem: rotulo(item.session_id),
     minha: item.session_id === sessionId,
     automatica: item.session_id === SESSAO_SISTEMA,
+    casa: item.session_id === SESSAO_CASA,
     prioridade: Boolean(item.prioridade),
     musica: {
       id: item.musica_id,
@@ -123,12 +128,12 @@ export function marcarTocando(id, fimPrevistoEm) {
     .run(agora(), fimPrevistoEm, id);
 }
 
-// Reprodução da playlist automática não é pedido de ninguém: não entra no ranking nem no faturamento.
+// Playlist automática e pedidos da casa não são demanda de cliente: não entram no ranking nem no faturamento.
 // Em `historico_reproducao`, `creditos` é só a parte paga (base da divisão com a boate) e
 // `cortesia` a parte gratuita.
 export const concluir = db.transaction((item) => {
   db.prepare("UPDATE fila SET status = 'tocado' WHERE id = ?").run(item.id);
-  if (item.session_id === SESSAO_SISTEMA) return;
+  if (ehSessaoInterna(item.session_id)) return;
 
   db.prepare('UPDATE musicas SET vezes_tocada = vezes_tocada + 1 WHERE id = ?').run(item.musica_id);
   db.prepare('INSERT INTO historico_reproducao (id, musica_id, session_id, creditos, cortesia, tocado_em) VALUES (?, ?, ?, ?, ?, ?)')
@@ -141,25 +146,38 @@ const reembolsar = (item) => creditar(item.session_id, item.creditos - item.cred
 // Música que não tocou (arquivo sumiu, player quebrou) devolve o crédito pro cliente.
 export const falhar = db.transaction((item) => {
   db.prepare("UPDATE fila SET status = 'erro' WHERE id = ?").run(item.id);
-  if (item.session_id !== SESSAO_SISTEMA) reembolsar(item);
+  if (!ehSessaoInterna(item.session_id)) reembolsar(item);
 });
 
 export const remover = db.transaction((id) => {
   const item = db.prepare("SELECT * FROM fila WHERE id = ? AND status = 'aguardando'").get(id);
   if (!item) return null;
   db.prepare('DELETE FROM fila WHERE id = ?').run(id);
-  if (item.session_id !== SESSAO_SISTEMA) reembolsar(item);
+  if (!ehSessaoInterna(item.session_id)) reembolsar(item);
   return item;
 });
 
 // Sorteia uma música para tocar quando ninguém pediu nada, evitando as tocadas há pouco.
 // A faixa entra na fila como pertencente à sessão interna (sem custo).
-export function criarAutomatico(recentes = []) {
-  const sortear = (evitar) => {
-    const filtro = evitar.length ? `WHERE id NOT IN (${evitar.map(() => '?').join(',')})` : '';
-    return db.prepare(`SELECT id FROM musicas ${filtro} ORDER BY RANDOM() LIMIT 1`).get(...evitar);
+// `categorias` limita o sorteio ([] = qualquer uma); se a restrição não achar nada, sorteia de todas.
+export function criarAutomatico(recentes = [], categorias = []) {
+  const sortear = (evitar, apenas) => {
+    const condicoes = [VISIVEL];
+    const parametros = [];
+    if (evitar.length) {
+      condicoes.push(`m.id NOT IN (${evitar.map(() => '?').join(',')})`);
+      parametros.push(...evitar);
+    }
+    if (apenas.length) {
+      condicoes.push(`c.categoria_id IN (${apenas.map(() => '?').join(',')})`);
+      parametros.push(...apenas);
+    }
+    return db.prepare(`
+      SELECT m.id FROM musicas m JOIN cds c ON c.id = m.cd_id
+       WHERE ${condicoes.join(' AND ')} ORDER BY RANDOM() LIMIT 1
+    `).get(...parametros);
   };
-  const musica = sortear(recentes) ?? sortear([]);
+  const musica = sortear(recentes, categorias) ?? sortear([], categorias) ?? sortear([], []);
   if (!musica) return null;
 
   const { proxima } = db.prepare('SELECT COALESCE(MAX(posicao), 0) + 1 AS proxima FROM fila').get();
@@ -170,6 +188,20 @@ export function criarAutomatico(recentes = []) {
   `).run(id, SESSAO_SISTEMA, musica.id, proxima, agora());
   return db.prepare(`${ITEM_SELECT} WHERE f.id = ?`).get(id);
 }
+
+// Pedido do dono (grátis, fora do faturamento). Ignora limites e regras de repetição; `aSeguir`
+// põe à frente de todos (inclusive dos prioritários pagos), senão entra no fim da fila.
+export const adicionarDaCasa = db.transaction((musicaId, { aSeguir = false } = {}) => {
+  if (!db.prepare('SELECT 1 FROM musicas WHERE id = ?').get(musicaId)) throw new ErroApi(404, 'Música não encontrada');
+
+  const { proxima } = db.prepare('SELECT COALESCE(MAX(posicao), 0) + 1 AS proxima FROM fila').get();
+  const id = novoId();
+  db.prepare(`
+    INSERT INTO fila (id, session_id, musica_id, posicao, creditos, creditos_cortesia, prioridade, status, criado_em)
+    VALUES (?, ?, ?, ?, 0, 0, ?, 'aguardando', ?)
+  `).run(id, SESSAO_CASA, musicaId, proxima, aSeguir ? 2 : 0, agora());
+  return { id };
+});
 
 // Se o servidor caiu no meio de uma música, ela volta pro começo da fila (o cliente já pagou).
 // Faixas da playlist automática são descartadas: o player sorteia outra.

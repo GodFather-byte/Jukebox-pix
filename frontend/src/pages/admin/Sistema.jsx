@@ -43,6 +43,15 @@ export default function Sistema({ chamar, baixarArquivo }) {
 
   useEffect(() => { carregar(); }, [carregar]);
 
+  async function ocultarSemArquivo() {
+    try {
+      await chamar('/admin/acervo/ocultar-sem-arquivo', { metodo: 'POST' });
+      await carregar();
+    } catch (e) {
+      setErro(e.message);
+    }
+  }
+
   async function fazerBackup() {
     setSalvando(true);
     try {
@@ -92,17 +101,26 @@ export default function Sistema({ chamar, baixarArquivo }) {
 
         <Item estado={faltando.total === 0 ? 'ok' : 'erro'} titulo={`Acervo: ${d.acervo.cds} CDs, ${d.acervo.musicas} músicas`}>
           {faltando.total === 0
-            ? 'Todos os arquivos de áudio estão no lugar.'
-            : <>{faltando.total} {faltando.total === 1 ? 'música está' : 'músicas estão'} sem arquivo (o cliente pagaria e a faixa falharia, com reembolso). Exclua ou reenvie:
+            ? <>Todos os arquivos de áudio estão no lugar{faltando.ocultas > 0 && <> ({faltando.ocultas} sem arquivo, já ocultas do app)</>}.</>
+            : <>{faltando.total} {faltando.total === 1 ? 'música está' : 'músicas estão'} sem arquivo (o cliente pagaria e a faixa falharia, com reembolso). Reenvie os arquivos ou oculte do app:
               <ul className="sistema-lista">
                 {faltando.exemplos.map((m) => <li key={m.arquivo}>{m.titulo} <small>{m.artista} · {m.cd}</small></li>)}
-              </ul></>}
+              </ul>
+              <button className="btn btn-pequeno" onClick={ocultarSemArquivo}>🙈 Ocultar todas do app</button></>}
         </Item>
 
         <Item estado={horasDesdeBackup == null ? 'erro' : horasDesdeBackup > 30 ? 'atencao' : 'ok'} titulo="Backup do banco">
           {ultimoBackup
             ? <>Último: {new Date(ultimoBackup.criado_em).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}. Automático todo dia às 4h.</>
             : 'Nenhum backup ainda.'}
+        </Item>
+
+        <Item estado={!d.backup_copia ? 'atencao' : !d.backup_copia.acessivel || !d.backup_copia.em_dia ? 'erro' : 'ok'} titulo="Cópia extra do backup">
+          {!d.backup_copia
+            ? 'Não configurada. Os backups ficam só neste computador: defina BACKUP_COPIA_DIR no .env apontando para uma pasta da nuvem (OneDrive/Google Drive) ou um pendrive.'
+            : d.backup_copia.em_dia && d.backup_copia.acessivel
+              ? <>Em dia: <code>{d.backup_copia.pasta}</code></>
+              : <>A pasta <code>{d.backup_copia.pasta}</code> {d.backup_copia.acessivel ? 'não recebeu o último backup' : 'não está acessível (pendrive solto? nuvem offline?)'}.</>}
         </Item>
 
         <Item estado="neutro" titulo="Agora">

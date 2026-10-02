@@ -98,6 +98,16 @@ export function gerar(de, ate) {
      GROUP BY a.id ORDER BY tocadas DESC, a.nome LIMIT 10
   `).all(desde, ateIso);
 
+  // CDs já no ar (e antigos o bastante) em que nenhuma música tocou no período: candidatos a trocar por outro.
+  const parados = db.prepare(`
+    SELECT c.titulo, a.nome AS artista, cat.nome AS categoria, c.criado_em,
+           (SELECT COUNT(*) FROM historico_reproducao h JOIN musicas m ON m.id = h.musica_id
+             WHERE m.cd_id = c.id AND h.tocado_em >= @desde AND h.tocado_em < @ate) AS tocadas
+      FROM cds c JOIN artistas a ON a.id = c.artista_id JOIN categorias cat ON cat.id = c.categoria_id
+     WHERE c.status = 'lancado' AND c.oculto = 0 AND c.criado_em < @desde AND tocadas = 0
+     ORDER BY c.criado_em
+  `).all({ desde, ate: ateIso });
+
   const pico = porHora.reduce((melhor, h) => (h.tocadas > melhor.tocadas ? h : melhor), porHora[0]);
 
   return {
@@ -109,6 +119,7 @@ export function gerar(de, ate) {
     horario_de_pico: pico.tocadas > 0 ? pico.hora : null,
     top_musicas: topMusicas,
     top_artistas: topArtistas,
+    acervo_parado: { total: parados.length, cds: parados.slice(0, 15) },
   };
 }
 

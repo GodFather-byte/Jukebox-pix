@@ -536,6 +536,30 @@ input[type='file'].campo { padding: 10px 14px; height: auto; }
 .backups { margin-top: 12px; }
 .sugestoes .admin-linha-info span { font-size: 0.82rem; }
 
+/* ---------- Bônus, console do dono, agenda da playlist, volume ---------- */
+.bonus-destaque { margin: 8px 0 0; padding: 8px 12px; background: rgba(0, 212, 255, 0.1); border: 1px solid rgba(0, 212, 255, 0.35); border-radius: var(--raio); color: var(--ciano); font-size: 0.85rem; font-weight: 600; text-align: center; }
+small.bonus-destaque { display: block; width: 100%; color: var(--ciano); }
+.pagamento-qr .bonus-destaque, .pagamento-ok .bonus-destaque { margin: 0; }
+.valor-bonus { margin-top: 2px; font-size: 0.7rem; font-weight: 700; color: var(--ciano); }
+
+.console-lista .admin-linha.oculta { opacity: 0.6; }
+.console-lista .admin-acoes { justify-content: flex-end; }
+
+.automatico-config { display: grid; gap: 10px; margin-top: 12px; }
+.automatico-config > small { margin-top: -6px; }
+.chips-multi { flex-wrap: wrap; overflow: visible; margin: 0; }
+.agenda-janela { display: grid; gap: 8px; padding: 12px; background: var(--superficie); border: 1px solid var(--borda); border-radius: var(--raio); }
+.agenda-horas { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; }
+.agenda-horas label, .faixa-bonus label { display: grid; gap: 6px; font-size: 0.8rem; font-weight: 600; color: var(--texto-2); }
+.agenda-horas .campo { min-width: 120px; }
+.faixa-bonus { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; padding: 10px 12px; background: var(--superficie); border: 1px solid var(--borda); border-radius: var(--raio); }
+.faixa-bonus .campo { min-width: 90px; max-width: 130px; }
+
+.volume { display: grid; gap: 6px; margin-top: 12px; }
+.volume-linha { display: flex; align-items: center; gap: 14px; }
+.volume-linha input[type='range'] { flex: 1; min-width: 0; accent-color: var(--rosa); height: 32px; }
+.volume-linha .mono { min-width: 3.4em; text-align: right; color: var(--ciano); }
+.acervo-parado { margin-top: 20px; }
 /* ---------- Impressão do fechamento ---------- */
 @media print {
   body { background: #fff !important; }
