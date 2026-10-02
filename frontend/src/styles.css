@@ -665,6 +665,8 @@ p.bonus-futuro { margin: 0 0 12px; }
 .musica-web { min-height: 72px; }
 .musica-web .musica-meta { flex-wrap: wrap; gap: 0 12px; }
 .musica-web .musica-meta > span { white-space: nowrap; }
+/* Música da internet no monitor: título de vídeo pode ser longo, então o "tocando agora" usa no máximo 3 linhas. */
+.tela-agora-corpo strong { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
 /* Título de vídeo costuma ter "Artista - Música": 3 linhas para o nome da música não ficar escondido. */
 .musica-web .musica-info strong { -webkit-line-clamp: 3; overflow-wrap: anywhere; }
 .web-thumb { width: 72px; height: 40px; flex: none; border-radius: 8px; object-fit: cover; background: var(--superficie-2); }

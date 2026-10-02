@@ -389,7 +389,21 @@ Por padrão as músicas da internet **não entram** na playlist automática (ela
 - ✅ **Telas**: fotografei cada tela nova (celular, monitor e painel, inclusive a impressão dos vales).
 - ✅ Os testes de **todas as funções anteriores** (cortesia, prioridade, backups, relatórios, playlist por horário…) continuam com o mesmo resultado.
 
+**Músicas da internet (seção 9), também numa cópia isolada:**
+
+- ✅ **366 verificações automáticas, sem nenhuma falha.** Usei um yt-dlp "de mentira" para provocar o que o programa real não deixa provocar (download que quebra, que trava, arquivo corrompido, vazio ou incompleto, YouTube pedindo login, dois clientes na mesma música ao mesmo tempo) e o yt-dlp de verdade para o resto. Cobre: aviso obrigatório ao ligar, filtros da busca, cache e limites de pesquisa (por pessoa e por aparelho), IDs maliciosos (`../../x`, `&list=`…), cobrança única e duplo toque, **reembolso para o saldo certo (pago × cortesia)**, regras da casa, tempo limite que mata o processo e apaga os restos, **queda do servidor no meio do download** (o crédito volta ao ligar), yt-dlp ausente e depois colocado no caminho configurado (os celulares são avisados na hora), apagar o CD, playlist automática, aviso no Telegram, eventos em tempo real, acentos e título do vídeo.
+- ✅ **yt-dlp 2026.08.19 e VLC 3.0.23 de verdade**, só com faixas de licença livre (Kevin MacLeod, CC BY): pesquisa em ~3 s, download em ~4 s, arquivo `.m4a` que abre e toca no VLC, ID que começa com hífen, vídeo de 1 hora barrado antes de cobrar (e também pelo próprio yt-dlp), vídeo inexistente, e o tempo limite **mata o `yt-dlp.exe` e os processos filhos** (conferi que nenhum sobrou).
+- ✅ **Telas**: busca com resultados reais do YouTube (miniaturas, acentos), "aguarde", "na fila" e a faixa azul "Preparando…"; a aba *Internet* do painel desligada, ligada e com o yt-dlp ausente.
+- ✅ **Seu banco, com o código final** (cópia): as 132 músicas continuam, a coluna, o índice e a tabela novos foram criados, todas as telas e rotas respondem, e o recurso aparece desligado com "yt-dlp não encontrado", que é exatamente o que você vai ver no seu PC. O seu banco original não foi aberto para escrita.
+- ✅ Testes das rodadas anteriores (preço, bônus, recados, vales, vinhetas, cartazes, Telegram, fechamento, ordem da fila, falha do player com o VLC de verdade e testes unitários) rodados de novo com o código novo: sem falhas.
+
 **Não testado (só você consegue):**
+
+- ❌ O **`winget install yt-dlp.yt-dlp`** em si: usei o mesmo programa oficial, baixado do GitHub do projeto, com o hash conferido. O yt-dlp **não está instalado** no seu PC.
+- ❌ O YouTube **bloquear ou pedir login a partir da sua internet** (aqui funcionou sem login). Se acontecer, veja a tabela "Se der problema" da seção 9.
+- ❌ O **som da música baixada** no alto-falante da boate (o VLC abriu e tocou o arquivo; eu não escuto o áudio).
+- ❌ Vários clientes reais pedindo pelo WiFi por horas, e o yt-dlp daqui a alguns meses (o YouTube muda; por isso existe o botão de atualizar e o aviso no Telegram).
+- ❌ A parte jurídica (termos do YouTube, direitos autorais, ECAD): nenhum teste mostra isso.
 
 - ❌ **Telegram de verdade**: testei contra um servidor de mentira que imita a API. A primeira mensagem real depende do seu token.
 - ❌ **O som saindo pelo alto-falante** da boate (verifiquei os processos e os argumentos; eu não escuto o áudio).

@@ -48,11 +48,18 @@ export default function BuscaInternet({ termo }) {
     setErro('');
   }, [termo]);
 
-  // Quando o download termina, o servidor avisa: o botão vira "NA FILA".
+  // A música entrou na fila: o botão mostra "NA FILA" por uns segundos e depois volta ao normal (já "na casa"), como nas outras listas.
+  const marcarNaFila = (id, segundos) => {
+    setNaFila((n) => ({ ...n, [id]: true }));
+    setDados((d) => (d ? { ...d, resultados: d.resultados.map((r) => (r.video_id === id ? { ...r, na_casa: true } : r)) } : d));
+    setTimeout(() => setNaFila((n) => ({ ...n, [id]: false })), segundos * 1000);
+  };
+
+  // Quando o download termina, o servidor avisa.
   useEffect(() => {
     const aoEvento = (e) => {
       const { video_id: id, status } = e.detail ?? {};
-      if (id && status === 'na_fila') setNaFila((n) => ({ ...n, [id]: true }));
+      if (id && status === 'na_fila') marcarNaFila(id, 4);
     };
     window.addEventListener('jukebox:youtube', aoEvento);
     return () => window.removeEventListener('jukebox:youtube', aoEvento);
@@ -82,7 +89,7 @@ export default function BuscaInternet({ termo }) {
       const r = await api('/youtube/comprar', { metodo: 'POST', corpo: { session_id: sessao.id, video_id: item.video_id } });
       atualizarSessao({ saldo: r.saldo });
       if (r.pronto) {
-        setNaFila((n) => ({ ...n, [item.video_id]: true }));
+        marcarNaFila(item.video_id, 2);
         mostrar(`"${item.titulo}" entrou na fila 🎶`, { tipo: 'ok' });
       } else {
         await recarregarPreparando();

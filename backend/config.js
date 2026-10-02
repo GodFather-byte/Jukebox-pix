@@ -13,6 +13,8 @@ const num = (nome, padrao) => {
   return Number.isFinite(n) ? n : padrao;
 };
 const caminho = (nome, padrao) => path.resolve(raiz, env[nome] || padrao);
+// Separa por espaços, respeitando aspas: --cookies "C:\Minha Pasta\cookies.txt" vira dois argumentos, não quatro.
+const argumentos = (texto) => [...String(texto ?? '').matchAll(/"([^"]*)"|(\S+)/g)].map((m) => m[1] ?? m[2]);
 const musicasDir = caminho('MUSICAS_DIR', 'musicas');
 
 export const config = {
@@ -74,7 +76,7 @@ export const config = {
   // Músicas pedidas pela internet (yt-dlp, instalado à parte). Fica desligado até o dono ligar no painel (aba Internet).
   youtube: {
     ytdlp: env.YTDLP_PATH || 'yt-dlp',
-    argsExtra: (env.YTDLP_ARGS_EXTRA || '').split(/\s+/).filter(Boolean), // ex.: --cookies-from-browser firefox
+    argsExtra: argumentos(env.YTDLP_ARGS_EXTRA), // ex.: --cookies-from-browser firefox
     pasta: path.join(musicasDir, 'SobDemanda'),
     tempoBuscaS: num('YTDLP_TEMPO_BUSCA_S', 40),
     tempoBaixarS: num('YTDLP_TEMPO_BAIXAR_S', 180),

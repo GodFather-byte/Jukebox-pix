@@ -118,9 +118,28 @@ const limparTermo = (bruto) => {
   return /[\p{L}\p{N}]{2}/u.test(termo) ? termo : '';
 };
 
-// Título como aparece na lista: se o do vídeo não diz quem canta, acrescenta o canal.
+// Dentro de parênteses, estas palavras só enfeitam o título do vídeo ("Official Video", "Letra", "4K"...).
+const ENFEITE = /\b(official|oficial|video|clipe|clip|audio|lyrics?|letra|visuali[sz]er|hd|4k|uhd|remaster(?:ed)?)\b/;
+
+// Tira do título o enfeite típico de vídeo: [colchetes] e (Official Video), (Letra), (4K)... Parênteses com informação de
+// verdade, como (Ao Vivo) ou (feat. Fulano), ficam. Se sobrar quase nada, fica o título original.
+export function semEnfeites(titulo) {
+  const original = String(titulo ?? '').trim();
+  let texto = original;
+  for (let i = 0; i < 3; i += 1) {
+    const antes = texto;
+    texto = texto
+      .replace(/\[[^\]]*\]/g, ' ')
+      .replace(/\(([^()]*)\)/g, (grupo, dentro) => (ENFEITE.test(normalizar(dentro)) ? ' ' : grupo));
+    if (texto === antes) break;
+  }
+  const limpo = texto.replace(/\s+/g, ' ').replace(/(?:\s*[-–—|:•·]+)+\s*$/, '').replace(/^\s*[-–—|:•·]+\s*/, '').trim();
+  return limpo.length >= 3 ? limpo : original;
+}
+
+// Título como aparece na lista: sem o enfeite do vídeo e, se ele não diz quem canta, com o canal no fim.
 export function tituloDaMusica(titulo, canal) {
-  const limpo = youtube.limparTitulo(titulo);
+  const limpo = semEnfeites(youtube.limparTitulo(titulo));
   const artista = youtube.limparTitulo(canal).replace(/\s*-\s*Topic$/i, '').replace(/VEVO$/i, '').trim();
   const jaTemArtista = /\s[-–—|]\s|:/.test(limpo) || (artista && normalizar(limpo).includes(normalizar(artista)));
   return (jaTemArtista || !artista ? limpo : `${limpo} — ${artista}`).slice(0, 140);
