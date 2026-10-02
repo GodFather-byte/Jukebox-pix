@@ -114,7 +114,7 @@ db.exec(`
     tocado_em TEXT NOT NULL
   );
 
-  -- Músicas que os clientes pediram e não existem no acervo. `chave` é o texto sem acento/caixa.
+  -- Músicas que os clientes pediram e não existem no acervo. "chave" é o texto sem acento/caixa.
   CREATE TABLE IF NOT EXISTS sugestoes_clientes (
     id TEXT PRIMARY KEY,
     texto TEXT NOT NULL,

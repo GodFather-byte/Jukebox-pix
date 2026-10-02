@@ -23,7 +23,7 @@ const rotuloDia = (iso) => iso.slice(8, 10) + '/' + iso.slice(5, 7);
 
 // Série única: sem legenda (o título diz o que é), grade fina, rótulo só no pico, tooltip + tabela.
 // serie: [{ dia: 'AAAA-MM-DD', valor: número plotado, texto: detalhe do tooltip/tabela }]
-export default function GraficoColunas({ serie, titulo, nomeValor = 'Valor' }) {
+export default function GraficoColunas({ serie, titulo, nomeValor = 'Valor', formatarRotulo = rotuloDia, nomeEixo = 'Dia' }) {
   const caixa = useRef(null);
   const [largura, setLargura] = useState(0);
   const [ativo, setAtivo] = useState(null);
@@ -69,7 +69,7 @@ export default function GraficoColunas({ serie, titulo, nomeValor = 'Valor' }) {
                     <path d={caminhoColuna(x, yDe(ponto.valor), espessura, altura)} className={`grafico-coluna ${ativo === i ? 'ativo' : ''}`} />
                   )}
                   {i % passoRotulo === 0 && (
-                    <text x={x0 + faixa / 2} y={ALTURA - 8} textAnchor="middle" className="grafico-eixo">{rotuloDia(ponto.dia)}</text>
+                    <text x={x0 + faixa / 2} y={ALTURA - 8} textAnchor="middle" className="grafico-eixo">{formatarRotulo(ponto.dia)}</text>
                   )}
                   {i === indicePico && ponto.valor > 0 && (
                     <text x={x0 + faixa / 2} y={yDe(ponto.valor) - 6} textAnchor="middle" className="grafico-pico">{ponto.valor}</text>
@@ -91,7 +91,7 @@ export default function GraficoColunas({ serie, titulo, nomeValor = 'Valor' }) {
             className="grafico-tooltip"
             style={{ left: Math.min(Math.max(MARGEM.esquerda + (ativo + 0.5) * faixa, 70), largura - 70) }}
           >
-            <strong>{rotuloDia(pontoAtivo.dia)}</strong>
+            <strong>{formatarRotulo(pontoAtivo.dia)}</strong>
             <span>{pontoAtivo.texto}</span>
           </div>
         )}
@@ -100,10 +100,10 @@ export default function GraficoColunas({ serie, titulo, nomeValor = 'Valor' }) {
       <details className="grafico-tabela">
         <summary>Ver como tabela</summary>
         <table>
-          <thead><tr><th>Dia</th><th>{nomeValor}</th><th>Detalhe</th></tr></thead>
+          <thead><tr><th>{nomeEixo}</th><th>{nomeValor}</th><th>Detalhe</th></tr></thead>
           <tbody>
             {serie.map((p) => (
-              <tr key={p.dia}><td>{rotuloDia(p.dia)}</td><td className="mono">{p.valor}</td><td>{p.texto}</td></tr>
+              <tr key={p.dia}><td>{formatarRotulo(p.dia)}</td><td className="mono">{p.valor}</td><td>{p.texto}</td></tr>
             ))}
           </tbody>
         </table>

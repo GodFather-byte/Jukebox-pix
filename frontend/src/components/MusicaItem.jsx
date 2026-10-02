@@ -9,17 +9,22 @@ import { useToast } from '../context/Toast.jsx';
 const MEDALHAS = ['🥇', '🥈', '🥉'];
 
 export default function MusicaItem({ musica, posicao, mostrarCapa = true }) {
-  const { adicionarMusica } = useSessao();
+  const { adicionarMusica, config } = useSessao();
   const mostrarToast = useToast();
   const navigate = useNavigate();
   const [estado, setEstado] = useState('ocioso'); // ocioso | enviando | ok
 
-  async function adicionar() {
+  const extra = config.prioridade.extra;
+  const custoPrioridade = (musica.creditos ?? 1) + extra;
+
+  async function adicionar(prioridade = false) {
     if (estado !== 'ocioso') return;
+    if (prioridade && !window.confirm(`Tocar a seguir custa ${custoPrioridade} créditos (${musica.creditos ?? 1} da música + ${extra} de prioridade). Confirmar?`)) return;
+
     setEstado('enviando');
     try {
-      await adicionarMusica(musica);
-      mostrarToast(`"${musica.titulo}" entrou na fila 🎶`, { tipo: 'ok' });
+      await adicionarMusica(musica, { prioridade });
+      mostrarToast(prioridade ? `⚡ "${musica.titulo}" vai tocar a seguir!` : `"${musica.titulo}" entrou na fila 🎶`, { tipo: 'ok' });
       setEstado('ok');
       setTimeout(() => setEstado('ocioso'), 1800);
     } catch (erro) {
@@ -44,10 +49,15 @@ export default function MusicaItem({ musica, posicao, mostrarCapa = true }) {
           <span className="mono">{formatarDuracao(musica.duracao)}</span>
           {musica.vezes_tocada > 0 && <span title="vezes tocada">🔥 <span className="mono">{musica.vezes_tocada}</span>x</span>}
         </small>
+        {config.prioridade.ativa && (
+          <button className="link-prio" title="Tocar a seguir, à frente da fila" onClick={() => adicionar(true)} disabled={estado === 'enviando'}>
+            ⚡ A seguir <span className="mono">({custoPrioridade} créd.)</span>
+          </button>
+        )}
       </div>
       <button
         className={`btn btn-add ${estado === 'ok' ? 'btn-ok' : ''}`}
-        onClick={adicionar}
+        onClick={() => adicionar(false)}
         disabled={estado === 'enviando'}
         aria-label={`Adicionar ${musica.titulo} à fila`}
       >

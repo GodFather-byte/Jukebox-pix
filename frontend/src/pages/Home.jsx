@@ -8,10 +8,11 @@ import { useSessao } from '../context/Sessao.jsx';
 import { useAgora, useApi } from '../hooks.js';
 
 export default function Home() {
-  const { saldo, sessao, versoes, fila } = useSessao();
+  const { saldo, sessao, versoes, fila, config } = useSessao();
   const lancamentos = useApi('/cds/lancamentos', [versoes.lancamentos]);
   const top = useApi('/musicas/top-tocadas', [versoes.top]);
   const categorias = useApi('/categorias', [versoes.lancamentos]);
+  const pedidos = useApi(sessao ? `/sessoes/${sessao.id}/pedidos` : null, [versoes.fila]);
   const agora = useAgora(30_000);
 
   const minutos = sessao?.expira_em ? Math.max(1, Math.floor((Date.parse(sessao.expira_em) - agora) / 60_000)) : 0;
@@ -20,18 +21,31 @@ export default function Home() {
 
   return (
     <>
+      {config.aviso && <div className="aviso-mural" role="status">📣 {config.aviso}</div>}
+
       <section className="card saldo-card">
         <span className="rotulo">Seus créditos</span>
         <div className="saldo-valor mono">{saldo}</div>
         <small>{saldo > 0 ? `Vencem em ~${minutos} min sem uso · 1 crédito = 1 música` : '1 crédito = R$ 1,00 = 1 música'}</small>
         {sessao?.saldo_cortesia > 0 && <small>🎁 {sessao.saldo_cortesia} de cortesia</small>}
-        <Link to="/pagar" className="btn btn-grande">PAGAR AGORA</Link>
+        {config.vendas_abertas
+          ? <Link to="/pagar" className="btn btn-grande">PAGAR AGORA</Link>
+          : <span className="btn btn-grande btn-desativado">VENDAS ENCERRADAS</span>}
       </section>
 
       {fila.agora_tocando && (
         <section className="secao">
           <h2>📋 Na fila agora</h2>
           <Fila limite={3} />
+        </section>
+      )}
+
+      {(pedidos.dados?.pedidos?.length ?? 0) > 0 && (
+        <section className="secao">
+          <h2>🔁 Pedir de novo</h2>
+          <ul className="lista-musicas">
+            {pedidos.dados.pedidos.map((m) => <MusicaItem key={m.id} musica={m} />)}
+          </ul>
         </section>
       )}
 

@@ -39,7 +39,7 @@ export default function Fila({ limite }) {
             <li key={item.id} className={`fila-item ${item.minha ? 'minha' : ''}`}>
               <span className="fila-pos mono">{i + 1}</span>
               <div className="fila-item-info">
-                <strong>{item.musica.titulo}</strong>
+                <strong>{item.prioridade ? '⚡ ' : ''}{item.musica.titulo}</strong>
                 <span>{item.musica.artista}</span>
               </div>
               <div className="fila-item-meta">

@@ -1,13 +1,17 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { api } from '../api.js';
+import { api, baixar } from '../api.js';
 import Biblioteca from './admin/Biblioteca.jsx';
 import Cadastros from './admin/Cadastros.jsx';
 import Cortesia from './admin/Cortesia.jsx';
 import Importar from './admin/Importar.jsx';
 import NovoCd from './admin/NovoCd.jsx';
 import PlayerAdmin from './admin/PlayerAdmin.jsx';
+import Regras from './admin/Regras.jsx';
+import Relatorio from './admin/Relatorio.jsx';
 import Resumo from './admin/Resumo.jsx';
+import Sistema from './admin/Sistema.jsx';
+import Sugestoes from './admin/Sugestoes.jsx';
 
 const CHAVE = 'jukebox_admin';
 const lerToken = () => { try { return sessionStorage.getItem(CHAVE); } catch { return null; } };
@@ -15,11 +19,15 @@ const gravarToken = (t) => { try { t ? sessionStorage.setItem(CHAVE, t) : sessio
 
 const ABAS = [
   ['resumo', '📊 Resumo'],
+  ['relatorio', '📈 Relatório'],
   ['player', '▶ Player'],
   ['biblioteca', '💿 Biblioteca'],
   ['novo', '➕ Novo CD'],
   ['importar', '📥 Importar'],
   ['cortesia', '🎁 Cortesia'],
+  ['regras', '⚙ Regras'],
+  ['sugestoes', '💡 Sugestões'],
+  ['sistema', '🖥 Sistema'],
   ['cadastros', '🏷 Cadastros'],
 ];
 
@@ -59,6 +67,17 @@ export default function AdminPanel() {
     throw erro;
   }), [token, sair]);
 
+  // Com muitas abas no celular, a ativa pode ficar fora da tela: rola até ela.
+  useEffect(() => {
+    document.querySelector('.aba.ativa')?.scrollIntoView({ inline: 'center', block: 'nearest' });
+  }, [aba]);
+
+  // Arquivos protegidos (CSV, backup): baixa com o token e entrega ao navegador.
+  const baixarArquivo = useCallback((caminho, nome) => baixar(caminho, token, nome).catch((erro) => {
+    if (erro.status === 401) sair();
+    throw erro;
+  }), [token, sair]);
+
   useEffect(() => {
     if (!token) return undefined;
     const eventos = new EventSource('/api/eventos');
@@ -87,11 +106,15 @@ export default function AdminPanel() {
 
       <section className="admin-conteudo">
         {aba === 'resumo' && <Resumo chamar={chamar} />}
+        {aba === 'relatorio' && <Relatorio chamar={chamar} baixarArquivo={baixarArquivo} />}
         {aba === 'player' && <PlayerAdmin chamar={chamar} versao={versao} />}
         {aba === 'biblioteca' && <Biblioteca chamar={chamar} versao={versao} />}
         {aba === 'novo' && <NovoCd chamar={chamar} aoCriar={() => setAba('biblioteca')} />}
         {aba === 'importar' && <Importar chamar={chamar} aoImportar={() => setVersao((v) => v + 1)} />}
         {aba === 'cortesia' && <Cortesia chamar={chamar} />}
+        {aba === 'regras' && <Regras chamar={chamar} />}
+        {aba === 'sugestoes' && <Sugestoes chamar={chamar} />}
+        {aba === 'sistema' && <Sistema chamar={chamar} baixarArquivo={baixarArquivo} />}
         {aba === 'cadastros' && <Cadastros chamar={chamar} />}
       </section>
     </main>

@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { Outlet, Route, Routes, useLocation } from 'react-router-dom';
 import Header from './components/Header.jsx';
+import Avisos from './components/Avisos.jsx';
 import MiniPlayer from './components/MiniPlayer.jsx';
 import NavInferior from './components/NavInferior.jsx';
 import { SessaoProvider, useSessao } from './context/Sessao.jsx';
@@ -40,6 +41,7 @@ function Conteudo() {
 
   return (
     <>
+      <Avisos />
       <Header />
       <main className="conteudo"><Outlet /></main>
       <MiniPlayer />

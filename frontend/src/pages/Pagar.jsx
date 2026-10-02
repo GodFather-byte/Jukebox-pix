@@ -4,6 +4,7 @@ import Estado from '../components/Estado.jsx';
 import QRCode from '../components/QRCode.jsx';
 import { api, formatarReais } from '../api.js';
 import { useSessao } from '../context/Sessao.jsx';
+import { useToast } from '../context/Toast.jsx';
 import { useAgora, useApi } from '../hooks.js';
 
 const CHAVE_PAGAMENTO = 'jukebox_pagamento';
@@ -16,7 +17,8 @@ function contagem(ms) {
 }
 
 export default function Pagar() {
-  const { sessao, saldo, atualizarSessao } = useSessao();
+  const { sessao, saldo, atualizarSessao, config } = useSessao();
+  const mostrarToast = useToast();
   const navigate = useNavigate();
   const info = useApi('/info');
 
@@ -79,6 +81,22 @@ export default function Pagar() {
     }
   }
 
+  // Cancela de verdade no servidor (e no provedor): um QR cancelado não pode ser pago depois.
+  async function cancelar() {
+    try {
+      const resultado = await api(`/pagamento/${pagamento.id}/cancelar`, { metodo: 'POST' });
+      if (resultado.status === 'confirmado') {
+        setPagamento(resultado); // já tinha sido pago: não desfaz, mostra a confirmação
+        return;
+      }
+    } catch (erro) {
+      mostrarToast(erro.message, { tipo: 'erro' });
+      return;
+    }
+    guardar(null);
+    setPagamento(null);
+  }
+
   function novoPix() {
     guardar(null);
     setPagamento(null);
@@ -111,10 +129,21 @@ export default function Pagar() {
               🧪 Simular pagamento (modo teste)
             </button>
           )}
-          <button className="btn btn-fantasma" onClick={novoPix}>Cancelar</button>
+          <button className="btn btn-fantasma" onClick={cancelar}>Cancelar</button>
         </section>
       );
     }
+  }
+
+  if (!config.vendas_abertas) {
+    return (
+      <section className="card pagamento-ok">
+        <div className="pagamento-icone">🌙</div>
+        <h1>Vendas encerradas</h1>
+        <p>No momento não estamos vendendo créditos novos. Quem já tem créditos continua pedindo músicas normalmente.</p>
+        <button className="btn btn-grande" onClick={() => navigate('/')}>VOLTAR</button>
+      </section>
+    );
   }
 
   return (

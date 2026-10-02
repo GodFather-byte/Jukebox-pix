@@ -39,3 +39,26 @@ export function textoDias(dias) {
   if (dias <= 0) return 'Sai hoje';
   return dias === 1 ? 'Sai em 1 dia' : `Sai em ${dias} dias`;
 }
+
+// Baixa um arquivo que exige o token do admin (um link comum não consegue enviar o cabeçalho).
+export async function baixar(caminho, token, nomeArquivo) {
+  let resposta;
+  try {
+    resposta = await fetch(`/api${caminho}`, { headers: { Authorization: `Bearer ${token}` } });
+  } catch {
+    throw Object.assign(new Error('Sem conexão com a jukebox.'), { status: 0 });
+  }
+  if (!resposta.ok) {
+    const dados = await resposta.json().catch(() => ({}));
+    throw Object.assign(new Error(dados.erro || 'Não foi possível baixar o arquivo.'), { status: resposta.status });
+  }
+
+  const url = URL.createObjectURL(await resposta.blob());
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = nomeArquivo;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}

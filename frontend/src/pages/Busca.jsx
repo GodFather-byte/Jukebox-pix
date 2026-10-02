@@ -1,7 +1,37 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Estado from '../components/Estado.jsx';
 import MusicaItem from '../components/MusicaItem.jsx';
+import { api } from '../api.js';
+import { useSessao } from '../context/Sessao.jsx';
+import { useToast } from '../context/Toast.jsx';
 import { useApi, useDebounce } from '../hooks.js';
+
+// Mostra quanta gente já pediu a mesma música; o dono vê essa lista no admin.
+function Sugerir({ texto }) {
+  const { sessao } = useSessao();
+  const mostrar = useToast();
+  const [estado, setEstado] = useState('ocioso'); // ocioso | enviando | enviado
+
+  useEffect(() => { setEstado('ocioso'); }, [texto]);
+
+  async function enviar() {
+    setEstado('enviando');
+    try {
+      const r = await api('/sugestoes', { metodo: 'POST', corpo: { session_id: sessao.id, texto } });
+      setEstado('enviado');
+      mostrar(r.pedidos > 1 ? `Obrigado! ${r.pedidos} pessoas já pediram essa.` : 'Obrigado! Vamos avaliar sua sugestão.', { tipo: 'ok' });
+    } catch (erro) {
+      setEstado('ocioso');
+      mostrar(erro.message, { tipo: 'erro' });
+    }
+  }
+
+  return (
+    <button className="btn btn-fantasma" onClick={enviar} disabled={estado !== 'ocioso'}>
+      {estado === 'enviado' ? '✔ Sugestão enviada' : `💡 Sugerir "${texto}" ao dono`}
+    </button>
+  );
+}
 
 export default function Busca() {
   const [texto, setTexto] = useState('');
@@ -50,7 +80,12 @@ export default function Busca() {
       {buscando && !resultado.dados && <Estado carregando={resultado.carregando} erro={resultado.erro} />}
       {buscando && resultado.dados && (
         resultado.dados.resultados.length === 0
-          ? <p className="vazio">Nada encontrado para “{termo}”. Tente outra palavra.</p>
+          ? (
+            <div className="sem-resultado">
+              <p className="vazio">Nada encontrado para “{termo}”. Tente outra palavra.</p>
+              <Sugerir texto={termo} />
+            </div>
+          )
           : (
             <ul className="lista-musicas">
               {resultado.dados.resultados.map((m) => <MusicaItem key={m.id} musica={m} />)}

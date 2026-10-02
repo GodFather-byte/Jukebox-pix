@@ -9,17 +9,21 @@ export default function Tela() {
   const info = useApi('/info');
   const [fila, setFila] = useState({ agora_tocando: null, fila: [], total_aguardando: 0 });
   const [top, setTop] = useState([]);
+  const [aviso, setAviso] = useState('');
 
   useEffect(() => {
     const carregarFila = () => api('/fila').then(setFila).catch(() => {});
     const carregarTop = () => api('/musicas/top-tocadas').then((d) => setTop(d.top)).catch(() => {});
+    const carregarAviso = () => api('/config').then((c) => setAviso(c.aviso)).catch(() => {});
     carregarFila();
     carregarTop();
+    carregarAviso();
 
     const eventos = new EventSource('/api/eventos');
     eventos.addEventListener('fila', carregarFila);
     eventos.addEventListener('top', carregarTop);
-    eventos.onopen = () => { carregarFila(); carregarTop(); };
+    eventos.addEventListener('config', carregarAviso);
+    eventos.onopen = () => { carregarFila(); carregarTop(); carregarAviso(); };
     const reserva = setInterval(carregarFila, 15_000);
     return () => { eventos.close(); clearInterval(reserva); };
   }, []);
@@ -37,6 +41,8 @@ export default function Tela() {
       </aside>
 
       <section className="tela-principal">
+        {aviso && <div className="tela-aviso" role="status">📣 {aviso}</div>}
+
         <div className="tela-agora">
           <span className="selo selo-ciano">▶ TOCANDO AGORA</span>
           {atual ? (
@@ -62,7 +68,7 @@ export default function Tela() {
               {fila.fila.slice(0, 6).map((item, i) => (
                 <li key={item.id} className="fila-item">
                   <span className="fila-pos mono">{i + 1}</span>
-                  <div className="fila-item-info"><strong>{item.musica.titulo}</strong><span>{item.musica.artista}</span></div>
+                  <div className="fila-item-info"><strong>{item.prioridade ? '⚡ ' : ''}{item.musica.titulo}</strong><span>{item.musica.artista}</span></div>
                   <small>{item.quem}</small>
                 </li>
               ))}

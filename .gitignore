@@ -4,3 +4,4 @@ database/*.db*
 musicas/*
 !musicas/.gitkeep
 frontend/dist/
+backups/
