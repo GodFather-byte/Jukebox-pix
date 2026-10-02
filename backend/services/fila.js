@@ -1,13 +1,13 @@
 import { db, agora, novoId, ehSessaoInterna, SESSAO_CASA, SESSAO_SISTEMA } from '../database.js';
 import { config } from '../config.js';
 import { ErroApi } from '../erros.js';
-import { VISIVEL } from './catalogo.js';
+import { precoEfetivo, VISIVEL } from './catalogo.js';
 import * as configuracoes from './configuracoes.js';
 import { creditar, debitar, obterSessao, rotulo } from './sessoes.js';
 
 const ITEM_SELECT = `
   SELECT f.id, f.session_id, f.posicao, f.status, f.creditos, f.creditos_cortesia, f.prioridade, f.iniciado_em, f.fim_previsto_em,
-         m.id AS musica_id, m.titulo, m.duracao, m.arquivo,
+         m.id AS musica_id, m.titulo, m.duracao, m.arquivo, m.lufs, m.pico_db,
          c.titulo AS cd, c.capa, a.nome AS artista, cat.icone, cat.cor
     FROM fila f
     JOIN musicas m ON m.id = f.musica_id
@@ -24,7 +24,7 @@ export const adicionar = db.transaction((sessionId, musicaId, { prioridade = fal
 
   // Música ou CD ocultos pelo dono não podem mais ser pedidos.
   const musica = db.prepare(`
-    SELECT m.id, m.creditos FROM musicas m JOIN cds c ON c.id = m.cd_id WHERE m.id = ? AND ${VISIVEL}
+    SELECT m.id, m.creditos, c.status AS cd_status FROM musicas m JOIN cds c ON c.id = m.cd_id WHERE m.id = ? AND ${VISIVEL}
   `).get(musicaId);
   if (!musica) throw new ErroApi(404, 'Música não encontrada');
 
@@ -50,7 +50,7 @@ export const adicionar = db.transaction((sessionId, musicaId, { prioridade = fal
     if (repetida) throw new ErroApi(409, 'Essa música já está na fila ou tocou há pouco. Escolha outra!', 'REPETIDA');
   }
 
-  let custo = musica.creditos;
+  let custo = precoEfetivo(musica);
   if (prioridade) {
     if (!regras.prioridade.ativa) throw new ErroApi(400, 'A fila prioritária não está disponível agora.', 'PRIORIDADE_INDISPONIVEL');
     if (contar("SELECT COUNT(*) AS total FROM fila WHERE prioridade = 1 AND status = 'aguardando'") >= regras.prioridade.limite) {
@@ -73,6 +73,18 @@ export const adicionar = db.transaction((sessionId, musicaId, { prioridade = fal
 
   return { id, saldo: obterSessao(sessionId).saldo };
 });
+
+// Música da internet: o valor foi cobrado no pedido (antes do download), então aqui ela só entra na fila.
+// Os valores guardados valem para o reembolso, se ela for removida ou falhar.
+export function adicionarPaga(sessionId, musicaId, { creditos, cortesia }) {
+  const { proxima } = db.prepare('SELECT COALESCE(MAX(posicao), 0) + 1 AS proxima FROM fila').get();
+  const id = novoId();
+  db.prepare(`
+    INSERT INTO fila (id, session_id, musica_id, posicao, creditos, creditos_cortesia, prioridade, status, criado_em)
+    VALUES (?, ?, ?, ?, ?, ?, 0, 'aguardando', ?)
+  `).run(id, sessionId, musicaId, proxima, creditos, cortesia, agora());
+  return id;
+}
 
 function paraCliente(item, sessionId, esperaSegundos) {
   return {
@@ -161,8 +173,11 @@ export const remover = db.transaction((id) => {
 // A faixa entra na fila como pertencente à sessão interna (sem custo).
 // `categorias` limita o sorteio ([] = qualquer uma); se a restrição não achar nada, sorteia de todas.
 export function criarAutomatico(recentes = [], categorias = []) {
+  // Músicas baixadas da internet só entram no sorteio se o dono permitiu (padrão: não).
+  const comInternet = configuracoes.lerYoutube().automatica;
   const sortear = (evitar, apenas) => {
     const condicoes = [VISIVEL];
+    if (!comInternet) condicoes.push('m.youtube_id IS NULL');
     const parametros = [];
     if (evitar.length) {
       condicoes.push(`m.id NOT IN (${evitar.map(() => '?').join(',')})`);

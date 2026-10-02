@@ -6,6 +6,7 @@ export default function Importar({ chamar, aoImportar }) {
   const [marcados, setMarcados] = useState(new Set());
   const [categoriaId, setCategoriaId] = useState('');
   const [status, setStatus] = useState('lancado');
+  const [preco, setPreco] = useState('1');
   const [carregando, setCarregando] = useState(false);
   const [importando, setImportando] = useState(false);
   const [resultado, setResultado] = useState(null);
@@ -49,7 +50,7 @@ export default function Importar({ chamar, aoImportar }) {
     try {
       const r = await chamar('/admin/importacao', {
         metodo: 'POST',
-        corpo: { chaves: [...marcados], categoria_id: categoriaId, status },
+        corpo: { chaves: [...marcados], categoria_id: categoriaId, status, preco: Number(preco || 1) },
       });
       setResultado(r);
       if (r.importados.length) aoImportar();
@@ -133,6 +134,9 @@ Uma imagem na pasta do CD (capa.jpg, cover.jpg...) vira a capa.`}</pre>
                     <option value="lancado">Direto na categoria (acervo antigo)</option>
                     <option value="novo">Lançamento (7 dias em LANÇAMENTOS)</option>
                   </select>
+                </label>
+                <label>Preço de cada música (créditos)
+                  <input className="campo mono" inputMode="numeric" value={preco} onChange={(e) => setPreco(e.target.value.replace(/\D/g, '').slice(0, 2))} />
                 </label>
                 <button className="btn btn-grande" onClick={importar} disabled={importando || marcados.size === 0}>
                   {importando ? 'IMPORTANDO… (pode demorar)' : `IMPORTAR ${marcados.size} CD${marcados.size === 1 ? '' : 'S'} (${totalFaixas} músicas)`}

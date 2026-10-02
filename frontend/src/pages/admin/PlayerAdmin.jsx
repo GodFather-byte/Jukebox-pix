@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Progresso from '../../components/Progresso.jsx';
 import { useDebounce } from '../../hooks.js';
 import AutomaticaConfig from './AutomaticaConfig.jsx';
+import VolumeParelho from './VolumeParelho.jsx';
 
 // Volume mestre: grava depois de ~0,4 s sem mexer no controle. O mpv muda na hora; o VLC, na próxima faixa.
 function Volume({ chamar, estado }) {
@@ -57,17 +58,17 @@ export default function PlayerAdmin({ chamar, versao }) {
   return (
     <>
       <h2>Player</h2>
-      {estado.backend === 'sim' && <p className="aviso">🧪 Player simulado: nenhum áudio sai do computador. Instale o mpv ou o VLC para tocar de verdade.</p>}
+      {estado.backend === 'sim' && <p className="aviso">🧪 Player simulado: nenhum áudio sai do computador. Instale o VLC (<code>winget install VideoLAN.VLC</code>) ou o mpv e reinicie o servidor.</p>}
       {erro && <p className="aviso aviso-erro">{erro}</p>}
 
       <div className="card fila-agora">
-        <span className="selo selo-ciano">{estado.pausado ? '⏸ FILA PAUSADA' : atual ? '▶ TOCANDO AGORA' : '⏹ PARADO'} · {estado.backend}</span>
+        <span className="selo selo-ciano">{estado.pausado ? '⏸ FILA PAUSADA' : estado.vinheta ? '📢 TOCANDO VINHETA' : atual ? '▶ TOCANDO AGORA' : '⏹ PARADO'} · {estado.backend}</span>
         {atual
           ? <div className="fila-agora-info"><strong>{atual.musica.titulo}</strong><span>{atual.musica.artista} · {atual.quem}</span></div>
-          : <p className="vazio">Nada tocando.</p>}
+          : <p className="vazio">{estado.vinheta ? 'Tocando uma vinheta sua entre as músicas.' : 'Nada tocando.'}</p>}
         <Progresso item={atual} />
         <div className="admin-acoes">
-          <button className="btn btn-pequeno" onClick={() => acao('/admin/player/pular', { metodo: 'POST' })} disabled={!atual}>⏭ Pular</button>
+          <button className="btn btn-pequeno" onClick={() => acao('/admin/player/pular', { metodo: 'POST' })} disabled={!atual && !estado.vinheta}>⏭ Pular</button>
           {estado.pausado
             ? <button className="btn btn-ciano btn-pequeno" onClick={() => acao('/admin/player/retomar', { metodo: 'POST' })}>▶ Retomar fila</button>
             : <button className="btn btn-fantasma btn-pequeno" onClick={() => acao('/admin/player/pausar', { metodo: 'POST' })}>⏸ Pausar fila</button>}
@@ -98,6 +99,7 @@ export default function PlayerAdmin({ chamar, versao }) {
 
       <AutomaticaConfig chamar={chamar} config={estado.automatico} aoSalvar={carregar} />
       <Volume chamar={chamar} estado={estado} />
+      <VolumeParelho chamar={chamar} />
 
       <h2>Na fila ({estado.total_aguardando})</h2>
       {estado.fila.length === 0 && <p className="vazio">Fila vazia.</p>}

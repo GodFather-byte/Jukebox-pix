@@ -5,19 +5,28 @@ import { argumentosMpv, argumentosVlc, definirVolumeMpv, mpvSuportaIpc, novoCami
 import { config } from './config.js';
 import { SESSAO_SISTEMA } from './database.js';
 import { emitirSessao, emitirTodos } from './events.js';
+import { avisar } from './services/alertas.js';
 import * as configuracoes from './services/configuracoes.js';
 import * as fila from './services/fila.js';
 import { obterSessao } from './services/sessoes.js';
+import * as vinhetas from './services/vinhetas.js';
+import * as volumeParelho from './services/volume.js';
 
 const RECENTES_MAX = 15; // não repete uma aleatória tocada nas últimas 15 faixas
 const PAUSA_APOS_FALHA_AUTOMATICA_MS = 5000; // evita laço rápido se os arquivos do acervo sumirem
+// Uma música de verdade nunca acaba em menos que isso. O VLC sai com código 0 até quando não consegue abrir o
+// arquivo (corrompido, formato estranho), e isso não pode contar como "tocou" (o cliente pagou e ficaria sem reembolso).
+const TEMPO_MINIMO_MS = 1500;
+const FALHAS_PARA_AVISAR = 3; // falhas seguidas até avisar o dono no Telegram
 
 let backend = null;
-let atual = null; // { item, proc, timer, pulada, automatica }
+let atual = null; // { item, proc, timer, pulada, automatica } ou { vinheta: true, proc, timer, pulada }
 let pausado = false;
 let intervalo = null;
 let recentes = [];
 let automaticoLivreEm = 0;
+let desdeVinheta = 0; // músicas tocadas desde a última vinheta
+let falhasSeguidas = 0;
 
 function comandoExiste(comando) {
   const r = spawnSync(comando, ['--version'], { stdio: 'ignore', timeout: 5000, windowsHide: true });
@@ -55,12 +64,13 @@ function escolherBackend() {
     throw new Error(`Player "${tipo}" não encontrado. Instale o mpv (https://mpv.io) ou o VLC, ou ajuste MPV_PATH/VLC_PATH.`);
   }
   console.warn('[player] mpv/VLC não encontrados: usando player SIMULADO (nenhum áudio será tocado).');
+  console.warn('[player] Para ouvir de verdade, instale o VLC (winget install VideoLAN.VLC) e reinicie o servidor.');
   return { tipo: 'sim' };
 }
 
-function argumentos(arquivo, ipc) {
+function argumentos(arquivo, ipc, ganho = 0) {
   const volume = configuracoes.lerVolume();
-  return backend.tipo === 'mpv' ? argumentosMpv(arquivo, { volume, ipc }) : argumentosVlc(arquivo, { volume });
+  return backend.tipo === 'mpv' ? argumentosMpv(arquivo, { volume, ipc, ganho }) : argumentosVlc(arquivo, { volume, ganho });
 }
 
 // Só toca arquivos dentro da pasta de músicas (o caminho vem do banco).
@@ -71,8 +81,18 @@ function resolverArquivo(relativo) {
 
 const avisarFila = () => emitirTodos('fila');
 
+function vinhetaDevida() {
+  const { ativo, a_cada: aCada } = configuracoes.lerVinhetas();
+  if (!ativo) {
+    desdeVinheta = 0; // só conta as músicas depois que o dono liga: ao ligar não toca uma vinheta "atrasada"
+    return false;
+  }
+  return desdeVinheta >= aCada && vinhetas.haAtivas();
+}
+
 function tick() {
   if (atual || pausado) return;
+  if (vinhetaDevida() && tocarVinheta()) return;
 
   let item = fila.proximo();
   // Fila vazia: se o modo automático estiver ligado, sorteia uma música pra não deixar o salão em silêncio.
@@ -82,6 +102,46 @@ function tick() {
   if (item) tocar(item);
 }
 
+// Vinheta: áudio do dono entre duas músicas. Não passa pela fila, não custa crédito e não entra em ranking nem faturamento.
+function tocarVinheta() {
+  desdeVinheta = 0; // zera já: se o arquivo sumiu, não tenta de novo a cada ciclo
+  const vinheta = vinhetas.proxima();
+  if (!vinheta) return false;
+
+  const simulado = backend.tipo === 'sim';
+  const arquivo = vinhetas.caminhoAbsoluto(vinheta);
+  if (!simulado && !arquivo) return false;
+
+  atual = { vinheta: true, item: null, proc: null, timer: null, pulada: false, automatica: false, ipc: null };
+  if (simulado) {
+    const segundos = Math.min(vinheta.duracao ?? config.player.simSegundos, config.player.simSegundos);
+    atual.timer = setTimeout(terminarVinheta, segundos * 1000);
+    return true;
+  }
+
+  atual.ipc = backend.tipo === 'mpv' && backend.ipc ? novoCaminhoIpc() : null;
+  const proc = spawn(backend.comando, argumentos(arquivo, atual.ipc), { stdio: 'ignore', windowsHide: true });
+  atual.proc = proc;
+  let encerrado = false;
+  const fim = () => {
+    if (encerrado) return;
+    encerrado = true;
+    terminarVinheta();
+  };
+  proc.once('error', (erro) => {
+    console.error(`[player] falha ao tocar a vinheta: ${erro.message}`);
+    fim();
+  });
+  proc.once('exit', fim);
+  return true;
+}
+
+function terminarVinheta() {
+  clearTimeout(atual?.timer);
+  atual = null;
+  setImmediate(tick);
+}
+
 function tocar(item) {
   const simulado = backend.tipo === 'sim';
   const segundos = simulado
@@ -89,6 +149,7 @@ function tocar(item) {
     : (item.duracao ?? 180);
 
   recentes = [...recentes, item.musica_id].slice(-RECENTES_MAX);
+  desdeVinheta += 1;
   fila.marcarTocando(item.id, new Date(Date.now() + segundos * 1000).toISOString());
   atual = { item, proc: null, timer: null, pulada: false, automatica: item.session_id === SESSAO_SISTEMA };
   avisarFila();
@@ -107,7 +168,9 @@ function tocar(item) {
 
   // O mpv recebe um canal de controle pra o admin mudar o volume com a música tocando.
   atual.ipc = backend.tipo === 'mpv' && backend.ipc ? novoCaminhoIpc() : null;
-  const proc = spawn(backend.comando, argumentos(arquivo, atual.ipc), { stdio: 'ignore', windowsHide: true });
+  const ganho = volumeParelho.ganhoParaItem(item); // volume parelho: dB a somar/subtrair nesta faixa (0 = desligado)
+  const comecouEm = Date.now();
+  const proc = spawn(backend.comando, argumentos(arquivo, atual.ipc, ganho), { stdio: 'ignore', windowsHide: true });
   atual.proc = proc;
   let encerrado = false;
   const fim = (ok) => {
@@ -119,7 +182,15 @@ function tocar(item) {
     console.error(`[player] falha ao iniciar ${backend.comando}: ${erro.message}`);
     fim(false);
   });
-  proc.once('exit', (codigo) => fim(codigo === 0 || Boolean(atual?.pulada)));
+  proc.once('exit', (codigo) => {
+    const pulada = Boolean(atual?.pulada);
+    const durouMs = Date.now() - comecouEm;
+    const tocouDeVerdade = codigo === 0 && durouMs >= TEMPO_MINIMO_MS;
+    if (codigo === 0 && !tocouDeVerdade && !pulada) {
+      console.error(`[player] "${item.titulo}" terminou em ${durouMs} ms sem tocar (arquivo ilegível?): crédito devolvido`);
+    }
+    fim(pulada || tocouDeVerdade);
+  });
 }
 
 function terminar(item, sucesso) {
@@ -128,8 +199,13 @@ function terminar(item, sucesso) {
   atual = null;
 
   if (sucesso) {
+    falhasSeguidas = 0;
     fila.concluir(item);
   } else {
+    falhasSeguidas += 1;
+    if (falhasSeguidas >= FALHAS_PARA_AVISAR) {
+      avisar('player', `🔇 O player falhou ${falhasSeguidas} vezes seguidas (última faixa: "${item.titulo}"). Confira o som do computador e os arquivos de música.`, { intervaloMin: 30 });
+    }
     fila.falhar(item);
     if (automatica) automaticoLivreEm = Date.now() + PAUSA_APOS_FALHA_AUTOMATICA_MS;
     else emitirSessao(item.session_id, 'sessao', obterSessao(item.session_id));
@@ -174,7 +250,8 @@ export function acordar() {
 export function pular() {
   if (!atual) return false;
   if (!atual.proc) {
-    terminar(atual.item, true);
+    if (atual.vinheta) terminarVinheta();
+    else terminar(atual.item, true);
   } else {
     atual.pulada = true;
     atual.proc.kill();
@@ -195,7 +272,9 @@ export const estado = () => ({
   backend: backend?.tipo ?? null,
   pausado,
   tocando: Boolean(atual),
+  vinheta: Boolean(atual?.vinheta),
   automatico: configuracoes.lerAutomatico(),
   volume: configuracoes.lerVolume(),
   volume_ao_vivo: Boolean(backend?.ipc),
+  volume_parelho: configuracoes.lerNormalizacao().ativa,
 });

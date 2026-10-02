@@ -8,18 +8,28 @@ import * as player from './player.js';
 import { iniciarCronLancamentos } from './crons/lancamentos.js';
 import { iniciarBackups } from './crons/backup.js';
 import { iniciarManutencao } from './crons/manutencao.js';
+import { iniciarVigia } from './crons/vigia.js';
 import { urlDoApp } from './rede.js';
 import { capasDir } from './services/biblioteca.js';
+import { cartazesDir } from './services/cartazes.js';
+import { iniciarRecados } from './services/recados.js';
+import { iniciarSobDemanda } from './services/sobdemanda.js';
+import { agendarAnalise } from './services/volume.js';
+import * as youtube from './services/youtube.js';
 import adminRoutes from './routes/admin.js';
 import artistasRoutes from './routes/artistas.js';
+import cartazesRoutes from './routes/cartazes.js';
 import categoriasRoutes from './routes/categorias.js';
 import cdsRoutes from './routes/cds.js';
 import filaRoutes from './routes/fila.js';
 import infoRoutes from './routes/info.js';
 import musicasRoutes from './routes/musicas.js';
 import pagamentoRoutes from './routes/pagamento.js';
+import recadosRoutes from './routes/recados.js';
 import sessoesRoutes from './routes/sessoes.js';
 import sugestoesRoutes from './routes/sugestoes.js';
+import valesRoutes from './routes/vales.js';
+import youtubeRoutes from './routes/youtube.js';
 
 validarConfig();
 
@@ -35,12 +45,17 @@ app.use('/api/sessoes', sessoesRoutes);
 app.use('/api/fila', filaRoutes);
 app.use('/api/pagamento', pagamentoRoutes);
 app.use('/api/sugestoes', sugestoesRoutes);
+app.use('/api/recados', recadosRoutes);
+app.use('/api/vales', valesRoutes);
+app.use('/api/cartazes', cartazesRoutes);
+app.use('/api/youtube', youtubeRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api', infoRoutes);
 app.use('/api', (req, res) => res.status(404).json({ erro: 'Rota não encontrada' }));
 
-// Só as capas são públicas; os arquivos de áudio nunca saem do notebook.
+// Só as capas e os cartazes do monitor são públicos; os arquivos de áudio nunca saem do notebook.
 app.use('/capas', express.static(capasDir, { maxAge: '1d' }));
+app.use('/cartazes', express.static(cartazesDir, { maxAge: '1d' }));
 
 const indexHtml = path.join(config.frontendDist, 'index.html');
 if (fs.existsSync(indexHtml)) {
@@ -55,7 +70,10 @@ if (fs.existsSync(indexHtml)) {
 
 app.use((erro, req, res, next) => {
   if (erro instanceof ErroApi) return res.status(erro.status).json({ erro: erro.message, codigo: erro.codigo });
-  if (erro?.name === 'MulterError') return res.status(400).json({ erro: `Upload inválido: ${erro.message}` });
+  if (erro?.name === 'MulterError') {
+    const motivos = { LIMIT_FILE_SIZE: 'o arquivo é grande demais', LIMIT_FILE_COUNT: 'arquivos demais', LIMIT_UNEXPECTED_FILE: 'arquivo inesperado' };
+    return res.status(400).json({ erro: `Upload inválido: ${motivos[erro.code] ?? erro.message}` });
+  }
   if (erro?.type === 'entity.parse.failed') return res.status(400).json({ erro: 'JSON inválido' });
   console.error(erro);
   res.status(500).json({ erro: 'Erro interno do servidor' });
@@ -65,6 +83,10 @@ const backendPlayer = player.iniciar();
 iniciarCronLancamentos();
 iniciarManutencao();
 iniciarBackups();
+iniciarRecados();
+iniciarSobDemanda(); // devolve o que ficou "preparando" numa queda e confere o yt-dlp (se o recurso estiver ligado)
+iniciarVigia();
+agendarAnalise(); // volume parelho ligado: mede em segundo plano o que ainda não foi medido
 
 const servidor = app.listen(config.porta, '0.0.0.0', () => {
   console.log(`\n🎵 ${config.nomeLocal} no ar`);
@@ -76,6 +98,7 @@ const servidor = app.listen(config.porta, '0.0.0.0', () => {
 
 function encerrar() {
   player.parar();
+  youtube.encerrarTudo();
   servidor.close(() => {
     db.close();
     process.exit(0);

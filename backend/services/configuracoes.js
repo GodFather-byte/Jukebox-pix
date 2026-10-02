@@ -1,5 +1,7 @@
-import { db } from '../database.js';
+import { db, normalizar } from '../database.js';
 import { ErroApi } from '../erros.js';
+import { telasConectadas } from '../events.js';
+import * as yt from './youtube.js';
 
 // Ajustes que o dono muda pelo admin e que precisam sobreviver a reinício (ao contrário do .env).
 const PADROES = {
@@ -16,8 +18,28 @@ const PADROES = {
   prioridade_limite: '3', // máximo de pedidos prioritários esperando ao mesmo tempo
   bonus_ativo: '0', // bônus de recarga
   bonus_faixas: '[]', // [{ valor, bonus }]
+  bonus_agenda: '[]', // [{ inicio, fim }]: o bônus só vale dentro dessas janelas ([] = o dia todo)
+  preco_lancamento: '0', // preço mínimo (em créditos) das músicas de CDs em LANÇAMENTOS; 0 = desligado
   volume: '100', // 0 a 100
   aviso: '', // mural exibido no app e no monitor
+  recados_ativo: '0', // recado pago no telão
+  recados_preco: '5', // créditos por recado
+  recados_segundos: '15', // tempo de cada recado no telão
+  recados_moderacao: '1', // o dono aprova antes de ir ao ar
+  recados_bloqueadas: '', // palavras proibidas, separadas por vírgula
+  vinhetas_ativo: '0', // toca uma vinheta de áudio de tempos em tempos
+  vinhetas_a_cada: '5', // a cada quantas músicas
+  cartazes_ativo: '0', // cartazes girando no monitor
+  cartazes_intervalo: '90', // segundos entre um cartaz e o próximo
+  normalizacao: '{"ativa":false,"alvo":null}', // volume parelho; alvo null = automático (mediana do acervo)
+  alertas: '{"player":true,"pix":true,"disco":true,"backup":true,"inicio":false,"youtube":true}', // avisos no Telegram
+  fechamento: '{"ativo":false,"hora":"06:00","boate":false}', // fechamento diário no Telegram
+  fechamento_ultimo: '', // dia (AAAA-MM-DD) do último fechamento enviado
+  youtube_ativo: '0', // o cliente pode pedir músicas da internet (baixadas pelo yt-dlp)
+  youtube_aceite: '', // quando o dono confirmou ter lido o aviso de direitos autorais (ISO); vazio = ainda não
+  youtube_preco: '3', // créditos por música pedida pela internet
+  youtube_max_min: '8', // duração máxima (minutos) de uma música da internet
+  youtube_automatica: '0', // músicas da internet também entram na playlist automática
 };
 
 function ler(chave) {
@@ -42,6 +64,10 @@ function lerJson(chave) {
     return JSON.parse(PADROES[chave]);
   }
 }
+
+// Leitura e gravação avulsas para quem guarda um ajuste próprio (ex.: o último fechamento enviado).
+export const lerConfig = ler;
+export const gravarConfig = gravar;
 
 // ---------- Horários ("HH:MM", relógio do notebook) ----------
 
@@ -126,14 +152,26 @@ export function lerVendas(data = new Date()) {
 
 // ---------- Bônus de recarga ----------
 
+// O bônus vale quando a chave está ligada E (sem horários cadastrados ou dentro de algum deles).
+export function bonusAtivoAgora(data = new Date()) {
+  if (!lerBool('bonus_ativo')) return false;
+  const janelas = lerJson('bonus_agenda');
+  return janelas.length === 0 || janelas.some((j) => dentroDaJanela(j.inicio, j.fim, data));
+}
+
 // Maior faixa que o valor pago alcança (não acumula). O bônus entra como cortesia da casa.
 export function bonusPara(valor) {
-  if (!lerBool('bonus_ativo')) return 0;
+  if (!bonusAtivoAgora()) return 0;
   const faixa = lerJson('bonus_faixas')
     .filter((f) => valor >= f.valor)
     .sort((a, b) => b.valor - a.valor)[0];
   return faixa ? faixa.bonus : 0;
 }
+
+// ---------- Preço dos lançamentos ----------
+
+// Músicas de CDs ainda em LANÇAMENTOS custam pelo menos isto (0 = cada música usa o próprio preço).
+export const lerPrecoLancamento = () => Math.min(20, Math.max(0, lerInt('preco_lancamento')));
 
 // ---------- Volume ----------
 
@@ -146,10 +184,152 @@ export function salvarVolume(valor) {
   return volume;
 }
 
+// ---------- Recado no telão ----------
+
+export const RECADO_MAX_CARACTERES = 60;
+const MAX_PALAVRAS_BLOQUEADAS = 200;
+
+const gravarVarios = (novos) => db.transaction(() => {
+  for (const [chave, valor] of Object.entries(novos)) gravar(chave, valor);
+})();
+
+export function lerRecados() {
+  return {
+    ativo: lerBool('recados_ativo'),
+    preco: lerInt('recados_preco') || 5,
+    segundos: lerInt('recados_segundos') || 15,
+    moderacao: lerBool('recados_moderacao'),
+    bloqueadas: ler('recados_bloqueadas'),
+  };
+}
+
+// Palavras proibidas já sem acento/caixa, para comparar com o texto normalizado do recado.
+export const palavrasBloqueadas = () => ler('recados_bloqueadas').split(',').map((p) => normalizar(p).trim()).filter(Boolean);
+
+export function salvarRecados(entrada = {}) {
+  const novos = {};
+  if (entrada.ativo !== undefined) novos.recados_ativo = entrada.ativo ? '1' : '0';
+  if (entrada.preco !== undefined) novos.recados_preco = inteiroEntre(entrada.preco, 1, 50, 'Preço do recado');
+  if (entrada.segundos !== undefined) novos.recados_segundos = inteiroEntre(entrada.segundos, 5, 60, 'Tempo de cada recado no telão');
+  if (entrada.moderacao !== undefined) novos.recados_moderacao = entrada.moderacao ? '1' : '0';
+  if (entrada.bloqueadas !== undefined) {
+    const lista = String(entrada.bloqueadas).split(',').map((p) => p.replace(/\s+/g, ' ').trim()).filter(Boolean);
+    if (lista.length > MAX_PALAVRAS_BLOQUEADAS) throw new ErroApi(400, `A lista aceita até ${MAX_PALAVRAS_BLOQUEADAS} palavras.`);
+    if (lista.some((p) => p.length > 30)) throw new ErroApi(400, 'Cada palavra bloqueada pode ter no máximo 30 letras.');
+    novos.recados_bloqueadas = lista.join(', ');
+  }
+  gravarVarios(novos);
+  return lerRecados();
+}
+
+// ---------- Vinhetas de áudio e cartazes do monitor ----------
+
+export const lerVinhetas = () => ({ ativo: lerBool('vinhetas_ativo'), a_cada: lerInt('vinhetas_a_cada') || 5 });
+
+export function salvarVinhetas({ ativo, a_cada: aCada } = {}) {
+  const novos = {};
+  if (ativo !== undefined) novos.vinhetas_ativo = ativo ? '1' : '0';
+  if (aCada !== undefined) novos.vinhetas_a_cada = inteiroEntre(aCada, 1, 50, 'Tocar a vinheta a cada quantas músicas');
+  gravarVarios(novos);
+  return lerVinhetas();
+}
+
+export const lerCartazes = () => ({ ativo: lerBool('cartazes_ativo'), intervalo: lerInt('cartazes_intervalo') || 90 });
+
+export function salvarCartazes({ ativo, intervalo } = {}) {
+  const novos = {};
+  if (ativo !== undefined) novos.cartazes_ativo = ativo ? '1' : '0';
+  if (intervalo !== undefined) novos.cartazes_intervalo = inteiroEntre(intervalo, 20, 900, 'Segundos entre os cartazes');
+  gravarVarios(novos);
+  return lerCartazes();
+}
+
+// ---------- Volume parelho ----------
+
+// alvo = null: o servidor usa a mediana do acervo (o volume geral quase não muda).
+export function lerNormalizacao() {
+  const n = lerJson('normalizacao');
+  return { ativa: Boolean(n.ativa), alvo: Number.isFinite(n.alvo) ? n.alvo : null };
+}
+
+export function salvarNormalizacao({ ativa, alvo } = {}) {
+  const novo = lerNormalizacao();
+  if (ativa !== undefined) novo.ativa = Boolean(ativa);
+  if (alvo !== undefined) novo.alvo = alvo === null || alvo === '' ? null : inteiroEntre(alvo, -24, -6, 'Alvo de volume (LUFS)');
+  gravar('normalizacao', JSON.stringify(novo));
+  return lerNormalizacao();
+}
+
+// ---------- Músicas da internet (yt-dlp) ----------
+
+export function lerYoutube() {
+  return {
+    ativo: lerBool('youtube_ativo'),
+    preco: Math.min(20, Math.max(1, lerInt('youtube_preco') || 3)),
+    max_min: Math.min(20, Math.max(2, lerInt('youtube_max_min') || 8)),
+    automatica: lerBool('youtube_automatica'),
+    aceite_em: ler('youtube_aceite') || null,
+  };
+}
+
+// Ligar pela primeira vez exige a confirmação do aviso (direitos autorais e termos do YouTube); fica registrado quando.
+export function salvarYoutube(entrada = {}) {
+  const atual = lerYoutube();
+  const novos = {};
+  if (entrada.preco !== undefined) novos.youtube_preco = inteiroEntre(entrada.preco, 1, 20, 'Preço da música da internet');
+  if (entrada.max_min !== undefined) novos.youtube_max_min = inteiroEntre(entrada.max_min, 2, 20, 'Duração máxima da música');
+  if (entrada.automatica !== undefined) novos.youtube_automatica = entrada.automatica ? '1' : '0';
+  if (entrada.ativo !== undefined) {
+    if (entrada.ativo && !atual.aceite_em) {
+      if (entrada.aceite !== true) {
+        throw new ErroApi(400, 'Para ligar, confirme que você leu o aviso sobre direitos autorais e os termos do YouTube.', 'ACEITE_OBRIGATORIO');
+      }
+      novos.youtube_aceite = new Date().toISOString();
+    }
+    novos.youtube_ativo = entrada.ativo ? '1' : '0';
+  }
+  gravarVarios(novos);
+  return lerYoutube();
+}
+
+// ---------- Avisos no Telegram ----------
+
+export const TIPOS_DE_ALERTA = ['player', 'pix', 'disco', 'backup', 'inicio', 'youtube'];
+
+// Quem salvou os ajustes antes de existir um tipo novo não tem a chave dele: vale o padrão do tipo.
+export function lerAlertas() {
+  const salvos = lerJson('alertas');
+  const padroes = JSON.parse(PADROES.alertas);
+  return Object.fromEntries(TIPOS_DE_ALERTA.map((tipo) => [tipo, Boolean(tipo in salvos ? salvos[tipo] : padroes[tipo])]));
+}
+
+export function salvarAlertas(entrada = {}) {
+  const atuais = lerAlertas();
+  for (const tipo of TIPOS_DE_ALERTA) if (entrada[tipo] !== undefined) atuais[tipo] = Boolean(entrada[tipo]);
+  gravar('alertas', JSON.stringify(atuais));
+  return atuais;
+}
+
+export function lerFechamento() {
+  const f = lerJson('fechamento');
+  return { ativo: Boolean(f.ativo), hora: HORA_VALIDA.test(String(f.hora)) ? f.hora : '06:00', boate: Boolean(f.boate) };
+}
+
+export function salvarFechamento(entrada = {}) {
+  const novo = lerFechamento();
+  if (entrada.ativo !== undefined) novo.ativo = Boolean(entrada.ativo);
+  if (entrada.hora !== undefined) novo.hora = validarHora(entrada.hora, 'Hora do fechamento');
+  if (entrada.boate !== undefined) novo.boate = Boolean(entrada.boate);
+  gravar('fechamento', JSON.stringify(novo));
+  return lerFechamento();
+}
+
 // ---------- Regras da casa (públicas: o app do cliente precisa conhecê-las) ----------
 
 export function lerRegras() {
   const vendas = lerVendas();
+  const recados = lerRecados();
+  const internet = lerYoutube();
   return {
     vendas_abertas: vendas.aberta,
     vendas: { manual: vendas.manual, agenda: vendas.agenda, motivo_fechada: vendas.motivo_fechada },
@@ -160,7 +340,12 @@ export function lerRegras() {
       extra: lerInt('prioridade_extra'),
       limite: lerInt('prioridade_limite'),
     },
-    bonus: { ativo: lerBool('bonus_ativo'), faixas: lerJson('bonus_faixas') },
+    // `ativo` é o efetivo agora (chave ligada E dentro do horário); `habilitado` é só a chave do dono.
+    bonus: { ativo: bonusAtivoAgora(), habilitado: lerBool('bonus_ativo'), agenda: lerJson('bonus_agenda'), faixas: lerJson('bonus_faixas') },
+    precos: { lancamento: lerPrecoLancamento() },
+    recados: { ativo: recados.ativo, preco: recados.preco, max_caracteres: RECADO_MAX_CARACTERES, telao_online: telasConectadas() > 0 },
+    // O cliente só vê a busca na internet se o dono ligou E o yt-dlp está funcionando neste computador.
+    youtube: { ativo: internet.ativo && yt.pronto(), preco: internet.preco, max_min: internet.max_min },
     aviso: ler('aviso'),
   };
 }
@@ -171,6 +356,16 @@ function inteiroEntre(valor, minimo, maximo, nome) {
     throw new ErroApi(400, `${nome}: informe um número inteiro de ${minimo} a ${maximo}.`);
   }
   return n;
+}
+
+function validarJanelasDeBonus(janelas) {
+  if (!Array.isArray(janelas) || janelas.length > 6) throw new ErroApi(400, 'O horário do bônus aceita até 6 janelas.');
+  return janelas.map((j, i) => {
+    const inicio = validarHora(j?.inicio, `Janela ${i + 1} do bônus, início`);
+    const fim = validarHora(j?.fim, `Janela ${i + 1} do bônus, fim`);
+    if (inicio === fim) throw new ErroApi(400, `Janela ${i + 1} do bônus: o início e o fim não podem ser iguais.`);
+    return { inicio, fim };
+  });
 }
 
 function validarFaixasDeBonus(faixas) {
@@ -210,6 +405,9 @@ export function salvarRegras(entrada = {}) {
   const bonus = entrada.bonus ?? {};
   if (bonus.ativo !== undefined) novos.bonus_ativo = bonus.ativo ? '1' : '0';
   if (bonus.faixas !== undefined) novos.bonus_faixas = JSON.stringify(validarFaixasDeBonus(bonus.faixas));
+  if (bonus.agenda !== undefined) novos.bonus_agenda = JSON.stringify(validarJanelasDeBonus(bonus.agenda));
+  const precos = entrada.precos ?? {};
+  if (precos.lancamento !== undefined) novos.preco_lancamento = inteiroEntre(precos.lancamento, 0, 20, 'Preço dos lançamentos');
   if (entrada.aviso !== undefined) {
     const aviso = String(entrada.aviso).replace(/\s+/g, ' ').trim();
     if (aviso.length > 140) throw new ErroApi(400, 'O aviso pode ter no máximo 140 caracteres.');

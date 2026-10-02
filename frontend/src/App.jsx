@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { Outlet, Route, Routes, useLocation } from 'react-router-dom';
 import Header from './components/Header.jsx';
 import Avisos from './components/Avisos.jsx';
+import AvisoPreparando from './components/AvisoPreparando.jsx';
 import MiniPlayer from './components/MiniPlayer.jsx';
 import NavInferior from './components/NavInferior.jsx';
 import { SessaoProvider, useSessao } from './context/Sessao.jsx';
@@ -15,6 +16,8 @@ import FilaPagina from './pages/FilaPagina.jsx';
 import Home from './pages/Home.jsx';
 import Musicas from './pages/Musicas.jsx';
 import Pagar from './pages/Pagar.jsx';
+import Recado from './pages/Recado.jsx';
+import ResgatarVale from './pages/ResgatarVale.jsx';
 import Tela from './pages/Tela.jsx';
 import Top from './pages/Top.jsx';
 
@@ -43,6 +46,7 @@ function Conteudo() {
     <>
       <Avisos />
       <Header />
+      <AvisoPreparando />
       <main className="conteudo"><Outlet /></main>
       <MiniPlayer />
       <NavInferior />
@@ -76,6 +80,8 @@ export default function App() {
         <Route path="top" element={<Top />} />
         <Route path="fila" element={<FilaPagina />} />
         <Route path="pagar" element={<Pagar />} />
+        <Route path="recado" element={<Recado />} />
+        <Route path="vale/:codigo" element={<ResgatarVale />} />
         <Route path="*" element={<Home />} />
       </Route>
     </Routes>

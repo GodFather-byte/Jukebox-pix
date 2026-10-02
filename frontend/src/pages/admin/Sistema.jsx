@@ -82,7 +82,7 @@ export default function Sistema({ chamar, baixarArquivo }) {
       <div className="sistema">
         <Item estado={d.player.simulado ? 'erro' : 'ok'} titulo={`Player: ${d.player.backend ?? 'parado'}${d.player.pausado ? ' (fila pausada)' : ''}`}>
           {d.player.simulado
-            ? 'Simulado: nenhum som sai do computador. Instale o mpv ou o VLC para tocar de verdade.'
+            ? <>Simulado: nenhum som sai do computador e cada música “dura” só alguns segundos. Instale o VLC (no PowerShell: <code>winget install VideoLAN.VLC</code>) ou o mpv e <b>reinicie o servidor</b>; ao subir, o terminal deve mostrar “Player: vlc” (ou mpv).</>
             : 'Tocando com áudio real.'}
         </Item>
 

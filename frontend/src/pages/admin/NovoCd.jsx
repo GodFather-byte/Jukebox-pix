@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 
 export default function NovoCd({ chamar, aoCriar }) {
   const [cadastros, setCadastros] = useState({ categorias: [], artistas: [] });
-  const [form, setForm] = useState({ titulo: '', ano: new Date().getFullYear(), categoria_id: '', artista_id: '', artista_nome: '', status: 'novo' });
+  const [form, setForm] = useState({ titulo: '', ano: new Date().getFullYear(), categoria_id: '', artista_id: '', artista_nome: '', status: 'novo', preco: '1' });
   const [capa, setCapa] = useState(null);
   const [arquivos, setArquivos] = useState([]);
   const [titulos, setTitulos] = useState({});
@@ -29,6 +29,7 @@ export default function NovoCd({ chamar, aoCriar }) {
       corpo.append('ano', form.ano);
       corpo.append('categoria_id', form.categoria_id);
       corpo.append('status', form.status);
+      corpo.append('preco', form.preco || '1');
       if (novoArtista) corpo.append('artista_nome', form.artista_nome);
       else corpo.append('artista_id', form.artista_id);
       corpo.append('titulos', JSON.stringify(arquivos.map((_, i) => titulos[i] ?? '')));
@@ -86,6 +87,11 @@ export default function NovoCd({ chamar, aoCriar }) {
           <option value="novo">Lançamento (7 dias em LANÇAMENTOS)</option>
           <option value="lancado">Direto na categoria</option>
         </select>
+      </label>
+
+      <label>Preço de cada música (créditos; 1 crédito = R$ 1,00)
+        <input className="campo mono" inputMode="numeric" value={form.preco} onChange={(e) => setForm({ ...form, preco: e.target.value.replace(/\D/g, '').slice(0, 2) })} />
+        <small>Dá para cobrar mais pelos lançamentos e deixar o acervo antigo em 1. Você muda depois em Biblioteca.</small>
       </label>
 
       <label>Capa (JPG, PNG ou WebP — opcional)

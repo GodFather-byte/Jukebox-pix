@@ -8,18 +8,24 @@ function LinhaCd({ cd, categorias, artistas, chamar, aoMudar }) {
   const [form, setForm] = useState({});
   const [erro, setErro] = useState('');
 
+  // `preco` vazio = não mexer nos preços atuais (as músicas do CD podem ter preços diferentes).
   const abrir = () => {
-    setForm({ titulo: cd.titulo, ano: cd.ano ?? '', categoria_id: cd.categoria_id, artista_id: cd.artista_id, status: cd.status });
+    setForm({ titulo: cd.titulo, ano: cd.ano ?? '', categoria_id: cd.categoria_id, artista_id: cd.artista_id, status: cd.status, preco: '' });
     setEditando(true);
   };
 
   const salvar = async () => {
     try {
-      await chamar(`/admin/cds/${cd.id}`, { metodo: 'PUT', corpo: form });
+      const corpo = { ...form };
+      if (corpo.preco === '') delete corpo.preco; else corpo.preco = Number(corpo.preco);
+      await chamar(`/admin/cds/${cd.id}`, { metodo: 'PUT', corpo });
+      setErro('');
       setEditando(false);
       aoMudar();
     } catch (e) { setErro(e.message); }
   };
+
+  const preco = cd.preco_min === cd.preco_max ? `${cd.preco_max}` : `${cd.preco_min} a ${cd.preco_max}`;
 
   // Oculto some do app e da playlist automática; dá pra mostrar de novo a qualquer momento.
   const alternarOculto = async () => {
@@ -43,7 +49,7 @@ function LinhaCd({ cd, categorias, artistas, chamar, aoMudar }) {
     <li className="admin-linha">
       <div className="admin-linha-info">
         <strong>{cd.titulo}</strong>
-        <span>{cd.artista} · {cd.icone} {cd.categoria} · {cd.total_musicas} músicas · {cd.vezes_tocadas}x tocadas</span>
+        <span>{cd.artista} · {cd.icone} {cd.categoria} · {cd.total_musicas} músicas · {cd.vezes_tocadas}x tocadas · 💰 {preco} {cd.preco_max === 1 ? 'crédito' : 'créditos'}/música</span>
         <span className={`selo ${cd.status === 'novo' ? 'selo-rosa' : 'selo-ciano'}`}>
           {cd.status === 'novo' ? `🆕 Lançamento · ${textoDias(diasRestantes)}` : 'Na categoria'}
         </span>
@@ -74,6 +80,10 @@ function LinhaCd({ cd, categorias, artistas, chamar, aoMudar }) {
               <option value="novo">Lançamento (novo)</option>
               <option value="lancado">Na categoria</option>
             </select>
+          </label>
+          <label>Preço de TODAS as músicas (créditos)
+            <input className="campo mono" inputMode="numeric" placeholder={`não mudar (${preco})`} value={form.preco}
+              onChange={(e) => setForm({ ...form, preco: e.target.value.replace(/\D/g, '').slice(0, 2) })} />
           </label>
           <button className="btn" onClick={salvar}>SALVAR</button>
         </div>

@@ -21,6 +21,12 @@ const CONFIG_PADRAO = {
   max_pedidos_por_pessoa: 0,
   bloquear_repeticao_min: 0,
   prioridade: { ativa: false, extra: 2, limite: 3 },
+  // `ativo` = vale agora (chave ligada e dentro do horário); `habilitado` = só a chave do dono.
+  bonus: { ativo: false, habilitado: false, agenda: [], faixas: [] },
+  precos: { lancamento: 0 },
+  recados: { ativo: false, preco: 5, max_caracteres: 60, telao_online: false },
+  // Pedir música da internet: `ativo` só é verdadeiro se o dono ligou E o yt-dlp está funcionando no servidor.
+  youtube: { ativo: false, preco: 3, max_min: 8 },
   aviso: '',
 };
 
@@ -32,6 +38,8 @@ export function SessaoProvider({ children }) {
   const [versoes, setVersoes] = useState({ fila: 0, top: 0, lancamentos: 0, config: 0 });
   const [config, setConfig] = useState(CONFIG_PADRAO);
   const [tentativa, setTentativa] = useState(0);
+  // Músicas da internet que esta pessoa pediu e que ainda estão sendo baixadas (ainda não entraram na fila).
+  const [preparando, setPreparando] = useState([]);
 
   useEffect(() => {
     let ativo = true;
@@ -59,6 +67,13 @@ export function SessaoProvider({ children }) {
 
   const sessionId = sessao?.id;
 
+  const recarregarPreparando = useCallback(() => {
+    if (!sessionId) return Promise.resolve();
+    return api(`/youtube/pedidos/${sessionId}`)
+      .then((r) => setPreparando(r.pedidos.filter((p) => p.status === 'baixando')))
+      .catch(() => {});
+  }, [sessionId]);
+
   useEffect(() => {
     if (!sessionId) return undefined;
     const eventos = new EventSource(`/api/eventos?session_id=${sessionId}`);
@@ -70,14 +85,31 @@ export function SessaoProvider({ children }) {
     eventos.addEventListener('pagamento', (e) => {
       window.dispatchEvent(new CustomEvent('jukebox:pagamento', { detail: JSON.parse(e.data) }));
     });
+    // Andamento do recado no telão desta pessoa (aprovado, no ar, recusado...).
+    eventos.addEventListener('recado', (e) => {
+      window.dispatchEvent(new CustomEvent('jukebox:recado', { detail: JSON.parse(e.data) }));
+    });
+    // Música da internet: o servidor avisa quando a que esta pessoa pediu entrou na fila (ou falhou e o crédito voltou).
+    eventos.addEventListener('youtube', (e) => {
+      window.dispatchEvent(new CustomEvent('jukebox:youtube', { detail: JSON.parse(e.data) }));
+      recarregarPreparando();
+    });
     // Ao reconectar (WiFi oscilou) pode ter perdido eventos: refaz tudo.
     eventos.onopen = () => {
       setVersoes((v) => ({ fila: v.fila + 1, top: v.top + 1, lancamentos: v.lancamentos + 1, config: v.config + 1 }));
       api(`/sessoes/${sessionId}`).then((s) => setSessao((atual) => ({ ...atual, ...s }))).catch(() => {});
+      recarregarPreparando();
     };
 
     return () => eventos.close();
-  }, [sessionId]);
+  }, [sessionId, recarregarPreparando]);
+
+  // Rede de segurança: enquanto há música sendo baixada, confere de vez em quando (caso o aviso em tempo real se perca).
+  useEffect(() => {
+    if (preparando.length === 0) return undefined;
+    const id = setInterval(recarregarPreparando, 4000);
+    return () => clearInterval(id);
+  }, [preparando.length, recarregarPreparando]);
 
   useEffect(() => {
     if (!sessionId) return undefined;
@@ -107,10 +139,12 @@ export function SessaoProvider({ children }) {
     versoes,
     config,
     erroConexao,
+    preparando,
+    recarregarPreparando,
     adicionarMusica,
     tentarNovamente: () => setTentativa((n) => n + 1),
     atualizarSessao: (dados) => setSessao((s) => ({ ...s, ...dados })),
-  }), [sessao, fila, versoes, config, erroConexao, adicionarMusica]);
+  }), [sessao, fila, versoes, config, erroConexao, preparando, recarregarPreparando, adicionarMusica]);
 
   return <SessaoContext.Provider value={valor}>{children}</SessaoContext.Provider>;
 }

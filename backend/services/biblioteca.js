@@ -4,6 +4,7 @@ import { parseFile } from 'music-metadata';
 import { config } from '../config.js';
 import { agora, db, novoId, registrarLogCd, slug } from '../database.js';
 import { ErroApi } from '../erros.js';
+import { agendarAnalise } from './volume.js';
 
 export const EXT_AUDIO = new Set(['.mp3', '.m4a', '.aac', '.wav', '.flac', '.ogg']);
 export const EXT_IMAGEM = new Set(['.jpg', '.jpeg', '.png', '.webp']);
@@ -16,6 +17,16 @@ const LEITURAS_SIMULTANEAS = 6;
 
 const nomeSeguro = (texto) => slug(texto).slice(0, 60) || 'faixa';
 export const apagarArquivo = (arquivo) => fs.rmSync(arquivo, { force: true });
+
+// Preço de cada música do CD em créditos (1 crédito = R$ 1,00). Vazio vale 1.
+export function validarPreco(valor) {
+  if (valor === undefined || valor === null || valor === '') return 1;
+  const preco = Number(valor);
+  if (!Number.isInteger(preco) || preco < 1 || preco > 20) {
+    throw new ErroApi(400, 'Preço por música: informe um número inteiro de 1 a 20 créditos.');
+  }
+  return preco;
+}
 
 // rename é instantâneo; entre discos diferentes (EXDEV) cai para copiar + apagar.
 export function moverArquivo(origem, destino) {
@@ -83,11 +94,13 @@ function desfazerMovimentos(movimentos, pastasCriadas) {
  * capa:   { caminho, nomeOriginal } | null
  * faixas: [{ caminho, nomeOriginal, tituloManual? }]
  * status: 'novo' (fica em LANÇAMENTOS por LANCAMENTO_DIAS) ou 'lancado' (vai direto pra categoria)
+ * preco:  créditos cobrados por música deste CD (padrão 1)
  */
-export async function criarCd({ titulo, ano, categoriaId, artistaId, artistaNome, status = 'novo', capa = null, faixas, detalheLog }) {
+export async function criarCd({ titulo, ano, categoriaId, artistaId, artistaNome, status = 'novo', preco = 1, capa = null, faixas, detalheLog }) {
   const tituloLimpo = String(titulo ?? '').trim();
   if (!tituloLimpo) throw new ErroApi(400, 'Informe o título do CD');
   if (!faixas?.length) throw new ErroApi(400, 'Envie ao menos uma música');
+  const precoFinal = validarPreco(preco);
   if (!db.prepare('SELECT 1 FROM categorias WHERE id = ?').get(categoriaId)) throw new ErroApi(400, 'Categoria inválida');
 
   let idArtista = artistaId || null;
@@ -142,13 +155,15 @@ export async function criarCd({ titulo, ano, categoriaId, artistaId, artistaNome
 
       const inserir = db.prepare(`
         INSERT INTO musicas (id, titulo, cd_id, duracao, creditos, arquivo, criado_em)
-        VALUES (?, ?, ?, ?, 1, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
       `);
-      for (const m of musicas) inserir.run(m.id, m.titulo, cdId, m.duracao, m.arquivo, agoraIso);
+      for (const m of musicas) inserir.run(m.id, m.titulo, cdId, m.duracao, precoFinal, m.arquivo, agoraIso);
 
       registrarLogCd(cdId, tituloLimpo, 'criado', detalheLog
-        ?? `${musicas.length} música(s); ${lancadoJa ? 'direto na categoria' : `sai de LANÇAMENTOS em ${config.lancamentoDias} dias`}`);
+        ?? `${musicas.length} música(s); ${lancadoJa ? 'direto na categoria' : `sai de LANÇAMENTOS em ${config.lancamentoDias} dias`}${precoFinal > 1 ? `; ${precoFinal} créditos por música` : ''}`);
     })();
+
+    agendarAnalise(); // volume parelho: mede as faixas novas em segundo plano (se ligado e com ffmpeg)
 
     return { id: cdId, status: lancadoJa ? 'lancado' : 'novo', data_lancamento: dataLancamento, total_musicas: musicas.length };
   } catch (erro) {

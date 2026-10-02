@@ -159,6 +159,75 @@ db.exec(`
     em TEXT NOT NULL
   );
 
+  -- Recado pago no telão. "creditos" é o total cobrado e "creditos_cortesia" a parte que era grátis;
+  -- só conta no faturamento depois que aparece no telão (exibindo/exibido), igual à música tocada.
+  CREATE TABLE IF NOT EXISTS recados (
+    id TEXT PRIMARY KEY,
+    session_id TEXT NOT NULL,
+    texto TEXT NOT NULL,
+    creditos INTEGER NOT NULL,
+    creditos_cortesia INTEGER NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'pendente' CHECK (status IN ('pendente', 'aprovado', 'exibindo', 'exibido', 'recusado', 'expirado')),
+    criado_em TEXT NOT NULL,
+    decidido_em TEXT,
+    exibido_em TEXT,
+    exibir_ate TEXT
+  );
+
+  -- Vale-música: código de uso único que vira crédito de cortesia (custo do dono, fora da divisão).
+  CREATE TABLE IF NOT EXISTS vales (
+    codigo TEXT PRIMARY KEY,
+    creditos INTEGER NOT NULL,
+    lote TEXT NOT NULL,
+    observacao TEXT,
+    validade_em TEXT NOT NULL,
+    criado_em TEXT NOT NULL,
+    resgatado_em TEXT,
+    resgatado_por TEXT
+  );
+
+  -- Vinhetas de áudio do dono, tocadas de tempos em tempos entre as músicas.
+  CREATE TABLE IF NOT EXISTS vinhetas (
+    id TEXT PRIMARY KEY,
+    titulo TEXT NOT NULL,
+    arquivo TEXT NOT NULL,
+    duracao INTEGER,
+    ativa INTEGER NOT NULL DEFAULT 1,
+    criado_em TEXT NOT NULL
+  );
+
+  -- Cartazes (patrocinadores, promoções) que giram no monitor. inicio_em/fim_em são datas locais AAAA-MM-DD.
+  CREATE TABLE IF NOT EXISTS cartazes (
+    id TEXT PRIMARY KEY,
+    titulo TEXT NOT NULL,
+    imagem TEXT NOT NULL,
+    legenda TEXT,
+    segundos INTEGER NOT NULL DEFAULT 10,
+    ativo INTEGER NOT NULL DEFAULT 1,
+    inicio_em TEXT,
+    fim_em TEXT,
+    exibicoes INTEGER NOT NULL DEFAULT 0,
+    criado_em TEXT NOT NULL
+  );
+
+  -- Música pedida pela internet: o crédito é cobrado ao pedir e a música só entra na fila depois do download.
+  -- "creditos" é o total cobrado e "creditos_cortesia" a parte que era grátis (para devolver ao saldo de origem).
+  CREATE TABLE IF NOT EXISTS pedidos_youtube (
+    id TEXT PRIMARY KEY,
+    session_id TEXT NOT NULL,
+    video_id TEXT NOT NULL,
+    titulo TEXT NOT NULL,
+    canal TEXT,
+    duracao INTEGER,
+    creditos INTEGER NOT NULL,
+    creditos_cortesia INTEGER NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'baixando' CHECK (status IN ('baixando', 'na_fila', 'falhou')),
+    erro TEXT,
+    musica_id TEXT REFERENCES musicas(id) ON DELETE SET NULL,
+    criado_em TEXT NOT NULL,
+    atualizado_em TEXT NOT NULL
+  );
+
   CREATE INDEX IF NOT EXISTS idx_cds_status ON cds(status, data_lancamento);
   CREATE INDEX IF NOT EXISTS idx_cds_artista ON cds(artista_id);
   CREATE INDEX IF NOT EXISTS idx_musicas_cd ON musicas(cd_id);
@@ -166,6 +235,10 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_pagamentos_status ON pagamentos(status);
   CREATE UNIQUE INDEX IF NOT EXISTS idx_pagamentos_pix ON pagamentos(pix_id) WHERE pix_id IS NOT NULL;
   CREATE INDEX IF NOT EXISTS idx_historico_data ON historico_reproducao(tocado_em);
+  CREATE INDEX IF NOT EXISTS idx_recados_status ON recados(status, criado_em);
+  CREATE INDEX IF NOT EXISTS idx_vales_lote ON vales(lote);
+  CREATE INDEX IF NOT EXISTS idx_pedidos_youtube_status ON pedidos_youtube(status, criado_em);
+  CREATE INDEX IF NOT EXISTS idx_pedidos_youtube_sessao ON pedidos_youtube(session_id, criado_em);
 `);
 
 // Bancos criados por versões anteriores não têm as colunas novas.
@@ -180,6 +253,12 @@ garantirColuna('cds', 'oculto', 'INTEGER NOT NULL DEFAULT 0');
 garantirColuna('musicas', 'oculta', 'INTEGER NOT NULL DEFAULT 0');
 garantirColuna('pagamentos', 'bonus', 'INTEGER NOT NULL DEFAULT 0');
 garantirColuna('historico_reproducao', 'cortesia', 'INTEGER NOT NULL DEFAULT 0');
+// Volume parelho: loudness medido da faixa (LUFS) e pico (dBFS). NULL = ainda não analisada.
+garantirColuna('musicas', 'lufs', 'REAL');
+garantirColuna('musicas', 'pico_db', 'REAL');
+// Música baixada da internet: guarda o ID do vídeo (evita baixar de novo) e marca de onde veio.
+garantirColuna('musicas', 'youtube_id', 'TEXT');
+db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_musicas_youtube ON musicas(youtube_id) WHERE youtube_id IS NOT NULL');
 
 // Vencimento em 2999: nunca é zerada nem apagada pelas rotinas de limpeza.
 for (const id of [SESSAO_SISTEMA, SESSAO_CASA]) {

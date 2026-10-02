@@ -3,7 +3,7 @@ import path from 'node:path';
 import { config } from '../config.js';
 import { db, slug } from '../database.js';
 import { ErroApi } from '../erros.js';
-import { criarCd, EXT_AUDIO, EXT_IMAGEM } from './biblioteca.js';
+import { criarCd, EXT_AUDIO, EXT_IMAGEM, validarPreco } from './biblioteca.js';
 
 fs.mkdirSync(config.importDir, { recursive: true });
 
@@ -114,8 +114,9 @@ function limparPastasVazias(dir, ehRaiz = true) {
  * que o escaneamento acabou de achar: nenhum caminho do cliente é usado no disco.
  * Cada CD é independente: um que falha não derruba os outros (e seus arquivos ficam onde estavam).
  */
-export async function importar({ chaves, categoriaId, status }) {
+export async function importar({ chaves, categoriaId, status, preco = 1 }) {
   if (!Array.isArray(chaves) || !chaves.length) throw new ErroApi(400, 'Selecione ao menos um CD.');
+  validarPreco(preco); // erro de preço vale para o lote todo, antes de mover qualquer arquivo
 
   const porChave = new Map(escanear().cds.map((cd) => [cd.chave, cd]));
   const importados = [];
@@ -134,6 +135,7 @@ export async function importar({ chaves, categoriaId, status }) {
         categoriaId: cd.categoriaPasta ? garantirCategoria(cd.categoriaPasta) : categoriaId,
         artistaNome: cd.artista,
         status,
+        preco,
         capa: cd.capa ? { caminho: path.join(cd.dir, cd.capa), nomeOriginal: cd.capa } : null,
         faixas: cd.audios.map((nome) => ({ caminho: path.join(cd.dir, nome), nomeOriginal: nome })),
         detalheLog: `importação em lote (${cd.audios.length} música(s))`,

@@ -5,3 +5,6 @@ musicas/*
 !musicas/.gitkeep
 frontend/dist/
 backups/
+
+backups-test/
+musicas-test/

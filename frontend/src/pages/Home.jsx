@@ -4,6 +4,8 @@ import Estado from '../components/Estado.jsx';
 import Fila from '../components/Fila.jsx';
 import GradeCategorias from '../components/GradeCategorias.jsx';
 import MusicaItem from '../components/MusicaItem.jsx';
+import ValeForm from '../components/ValeForm.jsx';
+import { textoDasJanelas } from '../bonus.js';
 import { useSessao } from '../context/Sessao.jsx';
 import { useAgora, useApi } from '../hooks.js';
 
@@ -32,9 +34,39 @@ export default function Home() {
           ? <Link to="/pagar" className="btn btn-grande">PAGAR AGORA</Link>
           : <span className="btn btn-grande btn-desativado">VENDAS ENCERRADAS</span>}
         {config.vendas_abertas && config.bonus.ativo && config.bonus.faixas.length > 0 && (
-          <small className="bonus-destaque">🎁 Bônus: {config.bonus.faixas.map((f) => `R$ ${f.valor} → +${f.bonus}`).join(' · ')}</small>
+          <small className="bonus-destaque">
+            🎁 Bônus: {config.bonus.faixas.map((f) => `R$ ${f.valor} → +${f.bonus}`).join(' · ')}
+            {config.bonus.agenda.length > 0 && ` (hoje das ${textoDasJanelas(config.bonus.agenda)})`}
+          </small>
+        )}
+        {config.vendas_abertas && !config.bonus.ativo && config.bonus.habilitado && config.bonus.faixas.length > 0 && config.bonus.agenda.length > 0 && (
+          <small className="bonus-destaque bonus-futuro">
+            🎁 Bônus de recarga das {textoDasJanelas(config.bonus.agenda)}: {config.bonus.faixas.map((f) => `R$ ${f.valor} → +${f.bonus}`).join(' · ')}
+          </small>
         )}
       </section>
+
+      {config.recados.ativo && (
+        config.recados.telao_online ? (
+          <Link to="/recado" className="card recado-chamada">
+            <span className="recado-icone" aria-hidden="true">💬</span>
+            <span>
+              <strong>Mande um recado para o telão</strong>
+              <small>Aparece na tela da casa · {config.recados.preco} {config.recados.preco === 1 ? 'crédito' : 'créditos'}</small>
+            </span>
+          </Link>
+        ) : (
+          <div className="card recado-chamada recado-indisponivel">
+            <span className="recado-icone" aria-hidden="true">💬</span>
+            <span>
+              <strong>Recado no telão</strong>
+              <small>O telão está desligado agora</small>
+            </span>
+          </div>
+        )
+      )}
+
+      <ValeForm />
 
       {fila.agora_tocando && (
         <section className="secao">

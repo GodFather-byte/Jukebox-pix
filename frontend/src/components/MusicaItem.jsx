@@ -15,11 +15,12 @@ export default function MusicaItem({ musica, posicao, mostrarCapa = true }) {
   const [estado, setEstado] = useState('ocioso'); // ocioso | enviando | ok
 
   const extra = config.prioridade.extra;
-  const custoPrioridade = (musica.creditos ?? 1) + extra;
+  const preco = musica.creditos ?? 1; // já vem com o preço de lançamento, se houver
+  const custoPrioridade = preco + extra;
 
   async function adicionar(prioridade = false) {
     if (estado !== 'ocioso') return;
-    if (prioridade && !window.confirm(`Tocar a seguir custa ${custoPrioridade} créditos (${musica.creditos ?? 1} da música + ${extra} de prioridade). Confirmar?`)) return;
+    if (prioridade && !window.confirm(`Tocar a seguir custa ${custoPrioridade} créditos (${preco} da música + ${extra} de prioridade). Confirmar?`)) return;
 
     setEstado('enviando');
     try {
@@ -48,6 +49,7 @@ export default function MusicaItem({ musica, posicao, mostrarCapa = true }) {
         <small className="musica-meta">
           <span className="mono">{formatarDuracao(musica.duracao)}</span>
           {musica.vezes_tocada > 0 && <span title="vezes tocada">🔥 <span className="mono">{musica.vezes_tocada}</span>x</span>}
+          {preco > 1 && <span className="preco-tag" title="créditos cobrados por esta música">💰 {preco} créditos</span>}
         </small>
         {config.prioridade.ativa && (
           <button className="link-prio" title="Tocar a seguir, à frente da fila" onClick={() => adicionar(true)} disabled={estado === 'enviando'}>
@@ -59,7 +61,7 @@ export default function MusicaItem({ musica, posicao, mostrarCapa = true }) {
         className={`btn btn-add ${estado === 'ok' ? 'btn-ok' : ''}`}
         onClick={() => adicionar(false)}
         disabled={estado === 'enviando'}
-        aria-label={`Adicionar ${musica.titulo} à fila`}
+        aria-label={`Adicionar ${musica.titulo} à fila${preco > 1 ? ` por ${preco} créditos` : ''}`}
       >
         {estado === 'ok' ? '✔ NA FILA' : '+ ADICIONAR'}
       </button>

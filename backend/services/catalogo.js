@@ -1,11 +1,23 @@
 import { db, normalizar } from '../database.js';
+import { lerPrecoLancamento } from './configuracoes.js';
 
 // Música ou CD ocultos pelo dono nunca aparecem pro cliente (nem tocam na playlist automática).
 export const VISIVEL = 'm.oculta = 0 AND c.oculto = 0';
 
+// Preço em créditos que o cliente paga: o da música, ou o preço de lançamento se o CD ainda está em LANÇAMENTOS
+// e este for maior. É a mesma conta no que a tela mostra e no que a fila cobra.
+export const precoEfetivo = (musica, precoLancamento = lerPrecoLancamento()) =>
+  musica.cd_status === 'novo' ? Math.max(musica.creditos, precoLancamento) : musica.creditos;
+
+const comPreco = (musicas) => {
+  const lancamento = lerPrecoLancamento();
+  const ajustar = (m) => (m ? { ...m, creditos_base: m.creditos, creditos: precoEfetivo(m, lancamento) } : m);
+  return Array.isArray(musicas) ? musicas.map(ajustar) : ajustar(musicas);
+};
+
 const MUSICA_SELECT = `
   SELECT m.id, m.titulo, m.duracao, m.creditos, m.vezes_tocada, m.cd_id, m.oculta, c.oculto AS cd_oculto,
-         c.titulo AS cd, c.capa,
+         c.status AS cd_status, c.titulo AS cd, c.capa,
          a.id AS artista_id, a.nome AS artista,
          cat.id AS categoria_id, cat.nome AS categoria, cat.icone, cat.cor
     FROM musicas m
@@ -83,11 +95,11 @@ export function lancamentos() {
 }
 
 export function musicasDoCd(cdId) {
-  return db.prepare(`${MUSICA_SELECT} WHERE m.cd_id = ? AND m.oculta = 0 ORDER BY m.rowid`).all(cdId);
+  return comPreco(db.prepare(`${MUSICA_SELECT} WHERE m.cd_id = ? AND m.oculta = 0 ORDER BY m.rowid`).all(cdId));
 }
 
 export function obterMusica(id) {
-  return db.prepare(`${MUSICA_SELECT} WHERE m.id = ?`).get(id);
+  return comPreco(db.prepare(`${MUSICA_SELECT} WHERE m.id = ?`).get(id));
 }
 
 // Músicas que esta sessão pediu por último (sem repetir), pra pedir de novo com um toque.
@@ -100,16 +112,16 @@ export function pedidosRecentes(sessionId, limite = 6) {
 }
 
 export function topTocadas(limite = 5) {
-  return db.prepare(`${MUSICA_SELECT} WHERE m.vezes_tocada > 0 AND ${VISIVEL} ORDER BY m.vezes_tocada DESC, m.titulo LIMIT ?`)
-    .all(limite);
+  return comPreco(db.prepare(`${MUSICA_SELECT} WHERE m.vezes_tocada > 0 AND ${VISIVEL} ORDER BY m.vezes_tocada DESC, m.titulo LIMIT ?`)
+    .all(limite));
 }
 
 // Sorteia entre as mais tocadas; sem histórico ainda, sorteia do acervo todo.
 export function sugestoes(quantidade = 4) {
-  return db.prepare(`
+  return comPreco(db.prepare(`
     SELECT * FROM (${MUSICA_SELECT} WHERE ${VISIVEL} ORDER BY m.vezes_tocada DESC, RANDOM() LIMIT 20)
      ORDER BY RANDOM() LIMIT ?
-  `).all(quantidade);
+  `).all(quantidade));
 }
 
 // Cada palavra da busca precisa aparecer em algum de: música, artista, CD ou categoria.
@@ -128,6 +140,6 @@ export function buscar(termo, categoriaId, { incluirOcultas = false } = {}) {
   }
   if (!incluirOcultas) condicoes.push(VISIVEL);
 
-  return db.prepare(`${MUSICA_SELECT} WHERE ${condicoes.join(' AND ')} ORDER BY m.vezes_tocada DESC, m.titulo LIMIT 60`)
-    .all(...parametros);
+  return comPreco(db.prepare(`${MUSICA_SELECT} WHERE ${condicoes.join(' AND ')} ORDER BY m.vezes_tocada DESC, m.titulo LIMIT 60`)
+    .all(...parametros));
 }

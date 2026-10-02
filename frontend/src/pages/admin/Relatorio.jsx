@@ -71,9 +71,12 @@ export default function Relatorio({ chamar, baixarArquivo }) {
 
           <div className="tiles">
             <div className="tile">
-              <span className="rotulo">Faturado (músicas pagas tocadas)</span>
+              <span className="rotulo">Faturado (músicas e recados)</span>
               <div className="tile-valor">{formatarReais(t.bruto)}</div>
-              <small>{t.tocadas} músicas tocadas{t.cortesia > 0 ? `, ${t.cortesia} de cortesia` : ''}</small>
+              <small>
+                {t.tocadas} músicas tocadas{t.cortesia > 0 ? `, ${t.cortesia} de cortesia` : ''}
+                {t.recados > 0 ? ` · ${t.recados} ${t.recados === 1 ? 'recado' : 'recados'} no telão` : ''}
+              </small>
             </div>
             <div className="tile">
               <span className="rotulo">Sua parte ({dados.divisao_usuario}%)</span>
@@ -92,8 +95,9 @@ export default function Relatorio({ chamar, baixarArquivo }) {
             <div><dt>Pagamentos</dt><dd className="mono">{t.pagamentos}</dd></div>
             <div><dt>Ticket médio</dt><dd className="mono">{formatarReais(t.ticket_medio)}</dd></div>
             <div><dt>Horário de pico</dt><dd className="mono">{dados.horario_de_pico == null ? '—' : `${dados.horario_de_pico}h`}</dd></div>
+            {t.vales > 0 && <div><dt>Vales resgatados</dt><dd className="mono">{t.vales} ({t.vales_creditos} créd.)</dd></div>}
           </dl>
-          <p className="nota">A divisão considera só as músicas pagas efetivamente tocadas. Cortesia e playlist automática ficam de fora, e “Pix recebido” inclui créditos ainda não usados ou vencidos.</p>
+          <p className="nota">A divisão considera só as músicas pagas efetivamente tocadas e os recados que foram ao ar. Cortesia, vales e playlist automática ficam de fora (vales e bônus são custo seu), e “Pix recebido” inclui créditos ainda não usados ou vencidos.</p>
 
           <div className="relatorio-acoes so-tela">
             <button className="btn btn-ciano" onClick={baixarCsv}>⬇ Baixar CSV (Excel)</button>

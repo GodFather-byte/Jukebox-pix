@@ -26,8 +26,9 @@ router.get('/config', (req, res) => {
   res.json(lerRegras());
 });
 
+// ?tela=1 identifica o monitor (conta como "telão ligado" para o recado pago).
 router.get('/eventos', (req, res) => {
-  conectar(req, res, req.query.session_id ? String(req.query.session_id) : null);
+  conectar(req, res, req.query.session_id ? String(req.query.session_id) : null, { tela: req.query.tela === '1' });
 });
 
 export default router;

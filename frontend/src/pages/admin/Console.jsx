@@ -32,6 +32,17 @@ export default function Console({ chamar }) {
     }
   }
 
+  // Preço-base desta música (o do CD vale para todas; aqui dá para abrir uma exceção).
+  async function mudarPreco(musica, creditos) {
+    try {
+      await chamar(`/admin/musicas/${musica.id}/preco`, { metodo: 'PUT', corpo: { creditos: Number(creditos) } });
+      setResultados((lista) => lista.map((m) => (m.id === musica.id ? { ...m, creditos_base: Number(creditos) } : m)));
+      setMensagem({ tipo: 'ok', texto: `✔ “${musica.titulo}” agora custa ${creditos} ${Number(creditos) === 1 ? 'crédito' : 'créditos'}.` });
+    } catch (e) {
+      setMensagem({ tipo: 'erro', texto: e.message });
+    }
+  }
+
   async function alternarOculta(musica) {
     try {
       const r = await chamar(`/admin/musicas/${musica.id}/oculta`, { metodo: 'PUT', corpo: { oculta: !musica.oculta } });
@@ -66,6 +77,12 @@ export default function Console({ chamar }) {
                 {escondida && <span className="selo selo-rosa">🙈 {m.cd_oculto ? 'CD oculto' : 'Oculta'} no app</span>}
               </div>
               <div className="admin-acoes">
+                <label className="console-preco" title="Créditos cobrados por esta música">
+                  💰
+                  <select className="campo" value={m.creditos_base ?? m.creditos} onChange={(e) => mudarPreco(m, e.target.value)} aria-label={`Preço de ${m.titulo}`}>
+                    {[1, 2, 3, 4, 5, 6, 8, 10].map((n) => <option key={n} value={n}>{n} créd.</option>)}
+                  </select>
+                </label>
                 <button className="btn btn-pequeno" disabled={ocupado === `${m.id}:fila`} onClick={() => pedir(m, 'fila')}>+ Fila</button>
                 <button className="btn btn-ciano btn-pequeno" disabled={ocupado === `${m.id}:seguir`} onClick={() => pedir(m, 'seguir')}>⚡ A seguir</button>
                 <button className="btn btn-perigo btn-pequeno" disabled={ocupado === `${m.id}:agora`} onClick={() => pedir(m, 'agora')}>▶ Agora</button>

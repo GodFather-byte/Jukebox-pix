@@ -560,11 +560,144 @@ small.bonus-destaque { display: block; width: 100%; color: var(--ciano); }
 .volume-linha input[type='range'] { flex: 1; min-width: 0; accent-color: var(--rosa); height: 32px; }
 .volume-linha .mono { min-width: 3.4em; text-align: right; color: var(--ciano); }
 .acervo-parado { margin-top: 20px; }
+/* ---------- Preço, bônus por horário, recado no telão, vale-música (cliente) ---------- */
+.preco-tag { color: #F5B700; font-weight: 600; }
+.bonus-futuro { background: rgba(245, 183, 0, 0.08); border-color: rgba(245, 183, 0, 0.35); color: #F5B700; }
+small.bonus-futuro { color: #F5B700; }
+p.bonus-futuro { margin: 0 0 12px; }
+
+.recado-chamada { display: flex; align-items: center; gap: 14px; margin-top: 14px; border-color: rgba(255, 20, 147, 0.4); }
+.recado-chamada > span:last-child { display: flex; flex-direction: column; gap: 2px; }
+.recado-icone { font-size: 1.8rem; }
+.recado-indisponivel { opacity: 0.6; }
+
+.vale-box { margin-top: 14px; padding: 12px 16px; background: var(--superficie); border: 1px solid var(--borda); border-radius: var(--raio); }
+.vale-box summary { display: flex; align-items: center; min-height: 32px; cursor: pointer; font-weight: 600; color: var(--texto-2); }
+.vale-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; margin-top: 10px; }
+.vale-form .btn { margin: 0; }
+
+.recado-form { display: grid; gap: 8px; }
+.recado-texto { min-height: 92px; padding: 12px 14px; resize: none; line-height: 1.35; font-size: 1rem; }
+.recado-contador { justify-self: end; }
+.recado-saldo { margin: 0; color: var(--texto-2); font-size: 0.85rem; }
+.recado-lista { display: grid; gap: 8px; }
+.recado-item { display: flex; align-items: center; gap: 12px; padding: 10px 14px; background: var(--superficie); border: 1px solid var(--borda); border-radius: var(--raio); }
+.recado-item > div { display: flex; flex-direction: column; min-width: 0; }
+.recado-item strong { overflow-wrap: anywhere; }
+.recado-item.recado-exibindo { border-color: rgba(255, 20, 147, 0.6); }
+.recado-item.recado-recusado, .recado-item.recado-expirado { opacity: 0.7; }
+
+/* ---------- Monitor: recado pago e cartazes ---------- */
+.tela-recado {
+  position: fixed; z-index: 60; left: 4vw; right: 4vw; bottom: 6vh;
+  display: grid; gap: 14px; justify-items: center; padding: 3vh 4vw; text-align: center;
+  background: linear-gradient(135deg, rgba(255, 20, 147, 0.96), rgba(120, 20, 200, 0.96));
+  border: 3px solid #fff; border-radius: 28px;
+  box-shadow: 0 0 80px rgba(255, 20, 147, 0.55), 0 20px 60px rgba(0, 0, 0, 0.6);
+  animation: recado-entra 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.2);
+}
+.tela-recado p { margin: 0; max-width: 100%; font-family: var(--fonte-titulo); font-weight: 800; font-size: clamp(2rem, 5.5vw, 5.5rem); line-height: 1.15; overflow-wrap: anywhere; }
+.tela-recado .selo { background: rgba(0, 0, 0, 0.35); border-color: rgba(255, 255, 255, 0.7); color: #fff; font-size: clamp(0.8rem, 1.2vw, 1.2rem); }
+@keyframes recado-entra { from { opacity: 0; transform: translateY(60px) scale(0.92); } }
+.tela-cartaz { position: fixed; z-index: 50; inset: 0; display: grid; grid-template-rows: minmax(0, 1fr) auto; background: #000; animation: cartaz-entra 0.6s ease-out; }
+.tela-cartaz img { width: 100%; height: 100%; min-height: 0; object-fit: contain; }
+.tela-cartaz p { margin: 0; padding: 2vh 4vw; text-align: center; background: rgba(0, 0, 0, 0.75); font-weight: 700; font-size: clamp(1.2rem, 2.4vw, 2.6rem); }
+@keyframes cartaz-entra { from { opacity: 0; } }
+
+/* ---------- Admin: avisos fixos, recados, divulgação, volume parelho, alertas, vales ---------- */
+.banner-sem-som {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 14px;
+  margin-bottom: 16px; padding: 12px 16px; font-size: 0.9rem;
+  background: rgba(255, 107, 133, 0.12); border: 1px solid rgba(255, 107, 133, 0.6); border-left-width: 5px; border-radius: var(--raio);
+}
+.banner-sem-som .btn { margin: 0; }
+.banner-sem-som code, .alertas code, .volume-parelho code, .sistema-detalhe code, .internet-admin code {
+  padding: 1px 6px; background: rgba(0, 0, 0, 0.35); border-radius: 6px; color: var(--ciano); font-size: 0.82rem; word-break: break-all;
+}
+.aba-badge { margin-left: 6px; padding: 1px 7px; border-radius: 9px; background: var(--rosa-botao); color: #fff; font-size: 0.7rem; }
+.recados-hoje { margin-bottom: 12px; }
+.recado-no-ar { display: grid; gap: 8px; margin-bottom: 16px; border-color: rgba(255, 20, 147, 0.6); }
+.recado-no-ar-texto { margin: 0; font-family: var(--fonte-titulo); font-weight: 800; font-size: 1.4rem; overflow-wrap: anywhere; }
+.recado-admin-texto { overflow-wrap: anywhere; }
+.recados-config { max-width: none; }
+.admin-conteudo textarea.campo { padding: 10px 14px; line-height: 1.35; resize: vertical; }
+
+.divulgacao h2 { margin: 28px 0 12px; }
+.divulgacao-config { display: grid; gap: 14px; margin-bottom: 14px; }
+.divulgacao-campo { display: grid; gap: 6px; max-width: 260px; font-size: 0.8rem; font-weight: 600; color: var(--texto-2); }
+.cartaz-linha { grid-template-columns: 96px minmax(0, 1fr) auto; }
+.cartaz-miniatura { width: 96px; height: 64px; object-fit: cover; border-radius: 8px; background: #000; }
+.admin-linha.oculta { opacity: 0.6; }
+.console-preco { display: flex; align-items: center; gap: 4px; }
+.console-preco .campo { width: auto; min-height: 36px; padding: 0 6px; font-size: 0.78rem; }
+
+.volume-parelho { display: grid; gap: 12px; margin-top: 12px; }
+.volume-parelho-alvo { display: grid; gap: 10px; }
+.volume-parelho-alvo .marcar span { display: flex; flex-direction: column; }
+.volume-parelho-progresso { display: grid; gap: 6px; }
+
+.alertas h2 { margin: 24px 0 12px; }
+.alertas > h2:first-child { margin-top: 0; }
+.alertas-passos { display: grid; gap: 4px; margin: 8px 0 0; padding-left: 20px; list-style: decimal; }
+.alertas-conversas { display: grid; gap: 10px; margin: 12px 0; }
+.alertas-form { max-width: none; }
+
+.vales-impressao { margin-top: 24px; }
+.vales-impressao-topo { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.vales-impressao-topo h2 { margin: 0; }
+.vales-impressao-topo .btn { margin-top: 0; }
+.vales-folha { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; margin-top: 12px; }
+.vale-cartao { display: grid; gap: 4px; justify-items: center; padding: 12px; text-align: center; background: #fff; border: 2px dashed #555; border-radius: 12px; break-inside: avoid; page-break-inside: avoid; }
+.vale-cartao, .vale-cartao * { color: #111; }
+.vale-cartao-casa { font-family: var(--fonte-titulo); font-size: 0.95rem; }
+.vale-cartao-titulo { font-family: var(--fonte-titulo); font-weight: 800; letter-spacing: 0.12em; font-size: 0.72rem; }
+.vale-cartao-valor { font-family: var(--fonte-titulo); font-size: 1.15rem; }
+.vale-cartao img { width: 150px; height: 150px; }
+.vale-cartao-codigo { font-size: 1.05rem; font-weight: 700; letter-spacing: 0.12em; }
+.vale-cartao small { color: #444; font-size: 0.62rem; line-height: 1.25; }
+
+/* ---------- Músicas da internet (cliente e painel) ---------- */
+.internet { margin-top: 20px; }
+.internet-chamada { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 10px 14px; border-color: rgba(0, 212, 255, 0.4); }
+.internet-chamada > div { display: flex; flex-direction: column; gap: 2px; }
+.internet-chamada .btn { grid-column: 1 / -1; margin: 0; text-transform: none; letter-spacing: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.internet-icone { font-size: 1.8rem; }
+.musica-web { min-height: 72px; }
+.musica-web .musica-meta { flex-wrap: wrap; gap: 0 12px; }
+.musica-web .musica-meta > span { white-space: nowrap; }
+/* Título de vídeo costuma ter "Artista - Música": 3 linhas para o nome da música não ficar escondido. */
+.musica-web .musica-info strong { -webkit-line-clamp: 3; overflow-wrap: anywhere; }
+.web-thumb { width: 72px; height: 40px; flex: none; border-radius: 8px; object-fit: cover; background: var(--superficie-2); }
+.web-na-casa { color: var(--ok); font-weight: 600; }
+.preparando-web {
+  position: sticky; top: 56px; z-index: 19;
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 16px; font-size: 0.82rem; font-weight: 600; color: var(--ciano);
+  background: rgba(8, 40, 64, 0.92); backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(0, 212, 255, 0.4);
+}
+.preparando-web .carregando-pequeno { flex: none; border-top-color: var(--ciano); }
+
+.internet-admin h2 { margin: 24px 0 12px; }
+.internet-admin > .admin-topo-interno h2 { margin: 0; }
+.internet-admin .admin-acoes { margin-top: 10px; }
+.admin-form label.marcar { display: flex; flex-direction: row; align-items: flex-start; gap: 12px; font-size: 0.9rem; font-weight: 400; color: var(--texto); }
+.admin-form label.marcar input { margin-top: 2px; }
+.internet-admin .tiles { margin-top: 12px; }
+.internet-admin-form { max-width: none; }
+.aviso-legal { padding: 12px 16px; font-size: 0.88rem; background: rgba(245, 183, 0, 0.08); border: 1px solid rgba(245, 183, 0, 0.45); border-left-width: 5px; border-radius: var(--raio); }
+.aviso-legal strong { color: #F5B700; }
+.aviso-legal p { margin: 6px 0 0; color: var(--texto-2); }
+.internet-passos { display: grid; gap: 4px; margin: 8px 0 0; padding-left: 20px; list-style: decimal; }
+.internet-admin .sistema-detalhe code, .internet-admin .nota code { word-break: break-all; }
+
 /* ---------- Impressão do fechamento ---------- */
 @media print {
   body { background: #fff !important; }
   .admin { max-width: none; padding: 0; }
-  .admin-topo, .abas, .so-tela, .toasts { display: none !important; }
+  .admin-topo, .abas, .so-tela, .toasts, .banner-sem-som { display: none !important; }
+  .vales-folha { grid-template-columns: repeat(3, 1fr); gap: 6mm; margin-top: 0; }
+  .vale-cartao { border-color: #000 !important; }
   .so-impressao { display: block !important; margin-bottom: 12px; }
   .admin *, .admin *::before { color: #000 !important; background: transparent !important; box-shadow: none !important; text-shadow: none !important; }
   .tile, .card, .grafico, .relatorio-extras div, .tabela-rolavel { border: 1px solid #888 !important; }
@@ -589,7 +722,8 @@ small.bonus-destaque { display: block; width: 100%; color: var(--ciano); }
 }
 
 @media (max-width: 480px) {
-  .admin-linha { grid-template-columns: minmax(0, 1fr); }
+  .admin-linha, .cartaz-linha { grid-template-columns: minmax(0, 1fr); }
+  .vale-form { grid-template-columns: 1fr; }
   .barras li { grid-template-columns: 100px 1fr 36px; }
   .admin-form-linha { grid-template-columns: 1fr; }
 }

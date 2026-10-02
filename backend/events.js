@@ -3,7 +3,23 @@
 // (saldo) vão apenas pra conexão dona daquele session_id, que funciona como senha.
 const clientes = new Set();
 
-export function conectar(req, res, sessionId = null) {
+// O monitor (/tela) se identifica na conexão. Recado pago só é aceito com um telão ligado,
+// e os celulares precisam saber quando ele liga ou desliga.
+let avisoDeTelaPendente = null;
+
+export const telasConectadas = () => {
+  let total = 0;
+  for (const cliente of clientes) if (cliente.tela) total += 1;
+  return total;
+};
+
+function avisarMudancaDeTelas() {
+  clearTimeout(avisoDeTelaPendente);
+  avisoDeTelaPendente = setTimeout(() => emitirTodos('config'), 500); // junta o liga/desliga de várias abas
+  avisoDeTelaPendente.unref?.();
+}
+
+export function conectar(req, res, sessionId = null, { tela = false } = {}) {
   res.writeHead(200, {
     'Content-Type': 'text/event-stream; charset=utf-8',
     'Cache-Control': 'no-cache, no-transform',
@@ -12,9 +28,13 @@ export function conectar(req, res, sessionId = null) {
   });
   res.write('retry: 3000\n\n');
 
-  const cliente = { res, sessionId };
+  const cliente = { res, sessionId, tela };
   clientes.add(cliente);
-  req.on('close', () => clientes.delete(cliente));
+  if (tela) avisarMudancaDeTelas();
+  req.on('close', () => {
+    clientes.delete(cliente);
+    if (tela) avisarMudancaDeTelas();
+  });
 }
 
 function enviar(cliente, evento, dados) {

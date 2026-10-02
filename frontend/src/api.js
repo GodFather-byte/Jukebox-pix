@@ -40,6 +40,21 @@ export function textoDias(dias) {
   return dias === 1 ? 'Sai em 1 dia' : `Sai em ${dias} dias`;
 }
 
+// Busca um arquivo protegido (ex.: áudio de uma vinheta) e devolve um endereço temporário para tocar/mostrar no navegador.
+export async function buscarArquivo(caminho, token) {
+  let resposta;
+  try {
+    resposta = await fetch(`/api${caminho}`, { headers: { Authorization: `Bearer ${token}` } });
+  } catch {
+    throw Object.assign(new Error('Sem conexão com a jukebox.'), { status: 0 });
+  }
+  if (!resposta.ok) {
+    const dados = await resposta.json().catch(() => ({}));
+    throw Object.assign(new Error(dados.erro || 'Não foi possível abrir o arquivo.'), { status: resposta.status });
+  }
+  return URL.createObjectURL(await resposta.blob());
+}
+
 // Baixa um arquivo que exige o token do admin (um link comum não consegue enviar o cabeçalho).
 export async function baixar(caminho, token, nomeArquivo) {
   let resposta;

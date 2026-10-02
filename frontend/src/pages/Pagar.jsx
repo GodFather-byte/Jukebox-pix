@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import Estado from '../components/Estado.jsx';
 import QRCode from '../components/QRCode.jsx';
 import { api, formatarReais } from '../api.js';
-import { bonusPara } from '../bonus.js';
+import { bonusPara, textoDasJanelas } from '../bonus.js';
 import { useSessao } from '../context/Sessao.jsx';
 import { useToast } from '../context/Toast.jsx';
 import { useAgora, useApi } from '../hooks.js';
@@ -155,6 +155,12 @@ export default function Pagar() {
       <p className="subtitulo">1 crédito = R$ 1,00 = 1 música. Pague com Pix e toque na hora.</p>
 
       {pagamento && <p className="aviso aviso-erro">Esse Pix expirou. Gere um novo para continuar.</p>}
+
+      {!config.bonus.ativo && config.bonus.habilitado && config.bonus.faixas.length > 0 && config.bonus.agenda.length > 0 && (
+        <p className="bonus-destaque bonus-futuro">
+          🎁 Bônus de recarga das {textoDasJanelas(config.bonus.agenda)}: {config.bonus.faixas.map((f) => `R$ ${f.valor} → +${f.bonus}`).join(' · ')}
+        </p>
+      )}
 
       <div className="valores" role="group" aria-label="Valor">
         {valores.map((v) => (

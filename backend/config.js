@@ -26,6 +26,9 @@ export const config = {
   musicasDir,
   // Pasta onde você solta Artista/CD/faixas para importar vários CDs de uma vez.
   importDir: env.IMPORT_DIR ? path.resolve(raiz, env.IMPORT_DIR) : path.join(musicasDir, '_importar'),
+  // Vinhetas de áudio e cartazes do monitor ficam dentro da pasta de músicas, em pastas com "_" (nunca viram CD).
+  vinhetasDir: path.join(musicasDir, '_vinhetas'),
+  cartazesDir: path.join(musicasDir, '_cartazes'),
   frontendDist: path.join(raiz, 'frontend', 'dist'),
   backupDir: caminho('BACKUP_DIR', 'backups'),
   backupManter: num('BACKUP_MANTER', 14), // quantos backups diários guardar
@@ -63,6 +66,26 @@ export const config = {
     mpv: env.MPV_PATH || 'mpv',
     vlc: env.VLC_PATH || '',
     simSegundos: num('PLAYER_SIM_SEGUNDOS', 15),
+  },
+
+  // Medição de volume das músicas (volume parelho). Sem o ffmpeg só valem as tags ReplayGain dos arquivos.
+  ffmpeg: env.FFMPEG_PATH || 'ffmpeg',
+
+  // Músicas pedidas pela internet (yt-dlp, instalado à parte). Fica desligado até o dono ligar no painel (aba Internet).
+  youtube: {
+    ytdlp: env.YTDLP_PATH || 'yt-dlp',
+    argsExtra: (env.YTDLP_ARGS_EXTRA || '').split(/\s+/).filter(Boolean), // ex.: --cookies-from-browser firefox
+    pasta: path.join(musicasDir, 'SobDemanda'),
+    tempoBuscaS: num('YTDLP_TEMPO_BUSCA_S', 40),
+    tempoBaixarS: num('YTDLP_TEMPO_BAIXAR_S', 180),
+  },
+
+  // Avisos no celular do dono. Token e conversas ficam no .env (nunca no banco, que vai nos backups).
+  telegram: {
+    token: env.TELEGRAM_BOT_TOKEN || '',
+    chatDono: env.TELEGRAM_CHAT_ID || '',
+    chatBoate: env.TELEGRAM_CHAT_ID_BOATE || '',
+    api: (env.TELEGRAM_API_URL || 'https://api.telegram.org').replace(/\/+$/, ''), // só muda em testes
   },
 };
 

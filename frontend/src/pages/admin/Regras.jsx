@@ -12,11 +12,19 @@ function paraFormulario(r) {
     vendas_agenda_ativa: r.vendas.agenda.ativa,
     vendas_abre: r.vendas.agenda.abre,
     vendas_fecha: r.vendas.agenda.fecha,
-    bonus_ativo: r.bonus.ativo,
+    bonus_ativo: r.bonus.habilitado, // a chave do dono (o `ativo` do servidor já considera o horário)
     bonus_faixas: r.bonus.faixas.map((f) => ({ valor: String(f.valor), bonus: String(f.bonus) })),
+    bonus_agenda: r.bonus.agenda.map((j) => ({ inicio: j.inicio, fim: j.fim })),
+    preco_lancamento: String(r.precos.lancamento),
     aviso: r.aviso,
   };
 }
+
+const estadoDoBonus = (r) => {
+  if (!r.bonus.habilitado) return '⚪ Bônus desligado';
+  if (r.bonus.ativo) return '🟢 Bônus valendo agora';
+  return '🟡 Bônus ligado, mas fora do horário agora';
+};
 
 const estadoDasVendas = (r) => {
   if (r.vendas_abertas) return '🟢 Vendas de créditos abertas agora';
@@ -56,7 +64,12 @@ export default function Regras({ chamar }) {
           bloquear_repeticao_min: Number(form.bloquear_repeticao_min),
           prioridade: { ativa: form.prioridade_ativa, extra: Number(form.prioridade_extra), limite: Number(form.prioridade_limite) },
           vendas_agenda: { ativa: form.vendas_agenda_ativa, abre: form.vendas_abre, fecha: form.vendas_fecha },
-          bonus: { ativo: form.bonus_ativo, faixas: form.bonus_faixas.map((f) => ({ valor: Number(f.valor), bonus: Number(f.bonus) })) },
+          bonus: {
+            ativo: form.bonus_ativo,
+            faixas: form.bonus_faixas.map((f) => ({ valor: Number(f.valor), bonus: Number(f.bonus) })),
+            agenda: form.bonus_agenda,
+          },
+          precos: { lancamento: Number(form.preco_lancamento) },
           aviso: form.aviso,
         },
       });
@@ -79,6 +92,10 @@ export default function Regras({ chamar }) {
   const mudarFaixa = (i, campo, valor) => setForm({
     ...form,
     bonus_faixas: form.bonus_faixas.map((f, j) => (j === i ? { ...f, [campo]: valor.replace(/\D/g, '').slice(0, 3) } : f)),
+  });
+  const mudarJanela = (i, campo, valor) => setForm({
+    ...form,
+    bonus_agenda: form.bonus_agenda.map((j, k) => (k === i ? { ...j, [campo]: valor } : j)),
   });
 
   return (
@@ -118,7 +135,14 @@ export default function Regras({ chamar }) {
           <small>{form.aviso.length}/{LIMITE_AVISO}</small>
         </label>
 
+        <h2>💰 Preço dos lançamentos</h2>
+        <label>Músicas de CDs em LANÇAMENTOS custam pelo menos (créditos; 0 = cada música usa o próprio preço)
+          {numero('preco_lancamento')}
+          <small>Quando o CD sai de LANÇAMENTOS (após alguns dias) volta sozinho ao preço normal. O preço de cada CD ou música se define em Biblioteca, Novo CD, Importar e Console.</small>
+        </label>
+
         <h2>🎁 Bônus de recarga</h2>
+        <p className="aviso">{estadoDoBonus(regras)}</p>
         <label className="interruptor">
           <input type="checkbox" checked={form.bonus_ativo} onChange={(e) => setForm({ ...form, bonus_ativo: e.target.checked })} />
           <span className="interruptor-trilho" aria-hidden="true" />
@@ -136,6 +160,20 @@ export default function Regras({ chamar }) {
         ))}
         <button type="button" className="btn btn-fantasma btn-pequeno" disabled={form.bonus_faixas.length >= 6}
           onClick={() => setForm({ ...form, bonus_faixas: [...form.bonus_faixas, { valor: '20', bonus: '2' }] })}>+ Adicionar faixa</button>
+
+        <strong>🕒 Só nestes horários (opcional)</strong>
+        <small>Sem nenhum horário, o bônus vale o dia todo. Com horários (ex.: 20:00 às 22:00 para encher a casa cedo), só vale dentro deles; fora, os clientes veem “bônus das 20:00 às 22:00” como convite. O bônus vale o que estava na tela quando o Pix foi gerado.</small>
+        {form.bonus_agenda.map((janela, i) => (
+          <div key={i} className="agenda-janela">
+            <div className="agenda-horas">
+              <label>Das<input className="campo mono" type="time" value={janela.inicio} onChange={(e) => mudarJanela(i, 'inicio', e.target.value)} /></label>
+              <label>Às<input className="campo mono" type="time" value={janela.fim} onChange={(e) => mudarJanela(i, 'fim', e.target.value)} /></label>
+              <button type="button" className="btn btn-perigo btn-pequeno" onClick={() => setForm({ ...form, bonus_agenda: form.bonus_agenda.filter((_, k) => k !== i) })}>Remover</button>
+            </div>
+          </div>
+        ))}
+        <button type="button" className="btn btn-fantasma btn-pequeno" disabled={form.bonus_agenda.length >= 6}
+          onClick={() => setForm({ ...form, bonus_agenda: [...form.bonus_agenda, { inicio: '20:00', fim: '22:00' }] })}>+ Adicionar horário</button>
 
         <h2>Proteção contra abuso</h2>
         <label>Máximo de músicas de uma pessoa na fila ao mesmo tempo (0 = sem limite)

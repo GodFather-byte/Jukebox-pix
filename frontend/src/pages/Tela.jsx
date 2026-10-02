@@ -4,29 +4,72 @@ import Progresso from '../components/Progresso.jsx';
 import { api } from '../api.js';
 import { useApi } from '../hooks.js';
 
+const SEM_CARTAZES = { ativo: false, intervalo: 90, cartazes: [] };
+
 // Tela do monitor da boate: QR pra abrir o app + o que está tocando e a fila. Sem sessão de cliente.
+// Também mostra os recados pagos (um por vez, por cima de tudo) e os cartazes dos patrocinadores.
 export default function Tela() {
   const info = useApi('/info');
   const [fila, setFila] = useState({ agora_tocando: null, fila: [], total_aguardando: 0 });
   const [top, setTop] = useState([]);
   const [aviso, setAviso] = useState('');
+  const [recado, setRecado] = useState(null); // { id, texto, ate }
+  const [cartazes, setCartazes] = useState(SEM_CARTAZES);
+  const [cartazAtual, setCartazAtual] = useState(null);
 
   useEffect(() => {
     const carregarFila = () => api('/fila').then(setFila).catch(() => {});
     const carregarTop = () => api('/musicas/top-tocadas').then((d) => setTop(d.top)).catch(() => {});
     const carregarAviso = () => api('/config').then((c) => setAviso(c.aviso)).catch(() => {});
-    carregarFila();
-    carregarTop();
-    carregarAviso();
+    const carregarRecado = () => api('/recados/atual').then((d) => setRecado(d.atual)).catch(() => {});
+    // Só troca o estado se mudou de verdade: senão o rodízio dos cartazes reiniciaria a cada consulta.
+    const carregarCartazes = () => api('/cartazes')
+      .then((c) => setCartazes((atual) => (JSON.stringify(atual) === JSON.stringify(c) ? atual : c)))
+      .catch(() => {});
+    const carregarTudo = () => { carregarFila(); carregarTop(); carregarAviso(); carregarRecado(); carregarCartazes(); };
+    carregarTudo();
 
-    const eventos = new EventSource('/api/eventos');
+    // ?tela=1 avisa o servidor que há um telão ligado (só então ele aceita recados pagos).
+    const eventos = new EventSource('/api/eventos?tela=1');
     eventos.addEventListener('fila', carregarFila);
     eventos.addEventListener('top', carregarTop);
     eventos.addEventListener('config', carregarAviso);
-    eventos.onopen = () => { carregarFila(); carregarTop(); carregarAviso(); };
+    eventos.addEventListener('recado', (e) => setRecado(JSON.parse(e.data).atual ?? null));
+    eventos.addEventListener('cartazes', carregarCartazes);
+    eventos.onopen = carregarTudo;
     const reserva = setInterval(carregarFila, 15_000);
-    return () => { eventos.close(); clearInterval(reserva); };
+    const reservaCartazes = setInterval(carregarCartazes, 5 * 60_000); // datas de validade mudam sozinhas
+    return () => { eventos.close(); clearInterval(reserva); clearInterval(reservaCartazes); };
   }, []);
+
+  // O recado some sozinho na hora marcada pelo servidor (mesmo se o aviso de "acabou" se perder).
+  useEffect(() => {
+    if (!recado?.ate) return undefined;
+    const restante = Date.parse(recado.ate) - Date.now();
+    const id = setTimeout(() => setRecado(null), Math.max(0, restante));
+    return () => clearTimeout(id);
+  }, [recado]);
+
+  // Cartazes: de tempos em tempos um ocupa a tela por alguns segundos, em rodízio. Cada exibição é contada.
+  useEffect(() => {
+    if (!cartazes.ativo || cartazes.cartazes.length === 0) { setCartazAtual(null); return undefined; }
+    let encerrado = false;
+    let relogio;
+    let vez = 0;
+    const mostrar = () => {
+      if (encerrado) return;
+      const cartaz = cartazes.cartazes[vez % cartazes.cartazes.length];
+      vez += 1;
+      setCartazAtual(cartaz);
+      api(`/cartazes/${cartaz.id}/exibido`, { metodo: 'POST' }).catch(() => {});
+      relogio = setTimeout(() => {
+        setCartazAtual(null);
+        relogio = setTimeout(mostrar, cartazes.intervalo * 1000);
+      }, cartaz.segundos * 1000);
+    };
+    relogio = setTimeout(mostrar, Math.min(cartazes.intervalo, 20) * 1000); // o primeiro aparece logo depois de abrir
+    return () => { encerrado = true; clearTimeout(relogio); setCartazAtual(null); };
+  }, [cartazes]);
 
   const atual = fila.agora_tocando;
 
@@ -92,6 +135,20 @@ export default function Tela() {
           )}
         </div>
       </section>
+
+      {cartazAtual && (
+        <div className="tela-cartaz" key={cartazAtual.id}>
+          <img src={cartazAtual.imagem} alt={cartazAtual.legenda ?? 'Cartaz'} />
+          {cartazAtual.legenda && <p>{cartazAtual.legenda}</p>}
+        </div>
+      )}
+
+      {recado && (
+        <div className="tela-recado" role="alert" key={recado.id}>
+          <span className="selo selo-rosa">💬 RECADO PARA O SALÃO</span>
+          <p>{recado.texto}</p>
+        </div>
+      )}
     </main>
   );
 }

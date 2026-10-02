@@ -4,6 +4,7 @@ import { config } from '../config.js';
 import { db } from '../database.js';
 import * as player from '../player.js';
 import { listarBackups, situacaoDaCopiaExtra } from './backup.js';
+import { provedorOnline } from './internet.js';
 
 const tamanhoDoArquivo = (caminho) => {
   try { return fs.statSync(caminho).size; } catch { return 0; }
@@ -24,15 +25,6 @@ function tamanhoDaPasta(pasta) {
     }
   }
   return total;
-}
-
-async function testarInternet() {
-  try {
-    await fetch('https://api.mercadopago.com', { method: 'HEAD', signal: AbortSignal.timeout(4000) });
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 function espacoEmDisco() {
@@ -85,7 +77,7 @@ export async function diagnostico() {
     pagamento: {
       provedor,
       modo_teste: provedor === 'mock',
-      internet: provedor === 'mock' ? null : await testarInternet(),
+      internet: provedor === 'mock' ? null : await provedorOnline(),
       pendentes: um("SELECT COUNT(*) n FROM pagamentos WHERE status = 'pendente'"),
     },
     disco: espacoEmDisco(),

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import BuscaInternet from '../components/BuscaInternet.jsx';
 import Estado from '../components/Estado.jsx';
 import MusicaItem from '../components/MusicaItem.jsx';
 import { api } from '../api.js';
@@ -92,6 +93,9 @@ export default function Busca() {
             </ul>
           )
       )}
+
+      {/* Só aparece se o dono ligou "músicas da internet" (e o yt-dlp está funcionando no servidor). */}
+      {buscando && resultado.dados && <BuscaInternet termo={termo} />}
     </>
   );
 }

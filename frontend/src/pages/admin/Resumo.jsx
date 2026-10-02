@@ -37,7 +37,8 @@ export default function Resumo({ chamar }) {
               <dl className="tile-detalhes">
                 <div><dt>Músicas tocadas</dt><dd className="mono">{p.tocadas}</dd></div>
                 <div><dt>Dessas, de cortesia (grátis)</dt><dd className="mono">{p.cortesia}</dd></div>
-                <div><dt>Faturado (tocadas)</dt><dd className="mono">{formatarReais(p.bruto)}</dd></div>
+                {p.recados > 0 && <div><dt>Recados no telão</dt><dd className="mono">{p.recados}</dd></div>}
+                <div><dt>Faturado (músicas e recados)</dt><dd className="mono">{formatarReais(p.bruto)}</dd></div>
                 <div><dt>Parte da boate</dt><dd className="mono">{formatarReais(p.boate)}</dd></div>
                 <div><dt>Pix recebido</dt><dd className="mono">{formatarReais(p.arrecadado)}</dd></div>
               </dl>
@@ -45,7 +46,7 @@ export default function Resumo({ chamar }) {
           );
         })}
       </div>
-      <p className="nota">A divisão considera só as músicas pagas efetivamente tocadas (cortesia e playlist automática ficam de fora). “Pix recebido” inclui créditos ainda não usados ou vencidos.</p>
+      <p className="nota">A divisão considera só as músicas pagas efetivamente tocadas e os recados que foram ao ar (cortesia, vales e playlist automática ficam de fora). “Pix recebido” inclui créditos ainda não usados ou vencidos.</p>
 
       <GraficoColunas
         titulo="Músicas tocadas por dia (últimos 14 dias)"

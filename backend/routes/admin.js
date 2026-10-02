@@ -9,16 +9,26 @@ import { emitirSessao, emitirTodos } from '../events.js';
 import { criarToken, exigirAdmin, limitarLogin, senhaConfere } from '../middleware/auth.js';
 import * as player from '../player.js';
 import * as backup from '../services/backup.js';
-import { apagarArquivo, capasDir, criarArtista, criarCd, EXT_AUDIO, EXT_IMAGEM } from '../services/biblioteca.js';
+import { apagarArquivo, capasDir, criarArtista, criarCd, EXT_AUDIO, EXT_IMAGEM, validarPreco } from '../services/biblioteca.js';
+import * as cartazes from '../services/cartazes.js';
 import { buscar } from '../services/catalogo.js';
 import * as configuracoes from '../services/configuracoes.js';
 import * as cortesia from '../services/cortesia.js';
 import { adicionarDaCasa, listar, remover } from '../services/fila.js';
+import * as fechamento from '../services/fechamento.js';
 import * as importacao from '../services/importacao.js';
+import * as recados from '../services/recados.js';
 import * as relatorio from '../services/relatorio.js';
 import { obterSessao } from '../services/sessoes.js';
 import * as sistema from '../services/sistema.js';
+import * as sobdemanda from '../services/sobdemanda.js';
 import * as sugestoes from '../services/sugestoes.js';
+import * as telegram from '../services/telegram.js';
+import * as vales from '../services/vales.js';
+import * as vinhetas from '../services/vinhetas.js';
+import * as volumeParelho from '../services/volume.js';
+import * as youtube from '../services/youtube.js';
+import { telasConectadas } from '../events.js';
 
 const router = Router();
 
@@ -39,6 +49,23 @@ const upload = multer({
     cb(null, true);
   },
 });
+
+// Uploads pequenos (vinheta de áudio, imagem de cartaz): arquivo único, limite próprio, mesma pasta temporária.
+function uploadUnico(campo, extensoes, limiteMb, mensagemDeTipo) {
+  return multer({
+    storage: multer.diskStorage({
+      destination: uploadDir,
+      filename: (req, file, cb) => cb(null, `${novoId()}${path.extname(file.originalname).toLowerCase()}`),
+    }),
+    limits: { fileSize: limiteMb * 1024 * 1024, files: 1 },
+    fileFilter: (req, file, cb) => {
+      if (!extensoes.has(path.extname(file.originalname).toLowerCase())) return cb(new ErroApi(400, mensagemDeTipo));
+      cb(null, true);
+    },
+  }).single(campo);
+}
+const enviarVinheta = uploadUnico('arquivo', EXT_AUDIO, 15, 'Envie um áudio MP3, M4A, WAV, FLAC ou OGG.');
+const enviarCartaz = uploadUnico('imagem', EXT_IMAGEM, 6, 'Envie uma imagem JPG, PNG ou WebP.');
 
 // ---------- Login ----------
 
@@ -98,7 +125,8 @@ router.get('/biblioteca', (req, res) => {
     SELECT c.id, c.titulo, c.ano, c.capa, c.status, c.data_lancamento,
            c.artista_id, c.categoria_id, c.oculto,
            a.nome AS artista, cat.nome AS categoria, cat.icone,
-           COUNT(m.id) AS total_musicas, COALESCE(SUM(m.vezes_tocada), 0) AS vezes_tocadas
+           COUNT(m.id) AS total_musicas, COALESCE(SUM(m.vezes_tocada), 0) AS vezes_tocadas,
+           COALESCE(MIN(m.creditos), 1) AS preco_min, COALESCE(MAX(m.creditos), 1) AS preco_max
       FROM cds c
       JOIN artistas a ON a.id = c.artista_id
       JOIN categorias cat ON cat.id = c.categoria_id
@@ -132,6 +160,7 @@ router.post(
         artistaId: req.body.artista_id,
         artistaNome: req.body.artista_nome,
         status: req.body.status === 'lancado' ? 'lancado' : 'novo',
+        preco: req.body.preco,
         capa: capa && { caminho: capa.path, nomeOriginal: capa.originalname },
         faixas: audios.map((audio, i) => ({ caminho: audio.path, nomeOriginal: audio.originalname, tituloManual: titulosManuais[i] })),
       });
@@ -152,11 +181,12 @@ router.get('/importacao', (req, res) => {
 });
 
 router.post('/importacao', async (req, res) => {
-  const { chaves, categoria_id: categoriaId, status } = req.body ?? {};
+  const { chaves, categoria_id: categoriaId, status, preco } = req.body ?? {};
   const resultado = await importacao.importar({
     chaves,
     categoriaId,
     status: status === 'lancado' ? 'lancado' : 'novo',
+    preco,
   });
   if (resultado.importados.length) emitirTodos('lancamentos');
   res.json(resultado);
@@ -171,6 +201,10 @@ router.put('/cds/:id', (req, res) => {
   if (!db.prepare('SELECT 1 FROM categorias WHERE id = ?').get(categoriaId)) throw new ErroApi(400, 'Categoria inválida');
   if (!db.prepare('SELECT 1 FROM artistas WHERE id = ?').get(artistaId)) throw new ErroApi(400, 'Artista inválido');
 
+  // Preço de todas as músicas do CD (vale para pedidos novos; o que já está na fila foi cobrado pelo preço antigo).
+  const enviado = req.body?.preco;
+  const preco = enviado === undefined || enviado === null || enviado === '' ? null : validarPreco(enviado);
+
   let dataLancamento = cd.data_lancamento;
   if (status !== cd.status) {
     dataLancamento = status === 'novo'
@@ -178,11 +212,15 @@ router.put('/cds/:id', (req, res) => {
       : agora();
   }
 
-  db.prepare('UPDATE cds SET titulo = ?, ano = ?, categoria_id = ?, artista_id = ?, status = ?, data_lancamento = ?, oculto = ? WHERE id = ?')
-    .run(titulo, ano ? Number(ano) : null, categoriaId, artistaId, status, dataLancamento, oculto ? 1 : 0, cd.id);
+  db.transaction(() => {
+    db.prepare('UPDATE cds SET titulo = ?, ano = ?, categoria_id = ?, artista_id = ?, status = ?, data_lancamento = ?, oculto = ? WHERE id = ?')
+      .run(titulo, ano ? Number(ano) : null, categoriaId, artistaId, status, dataLancamento, oculto ? 1 : 0, cd.id);
+    if (preco !== null) db.prepare('UPDATE musicas SET creditos = ? WHERE cd_id = ?').run(preco, cd.id);
+  })();
   const mudancas = [];
   if (status !== cd.status) mudancas.push(`status: ${cd.status} → ${status}`);
   if (Boolean(oculto) !== Boolean(cd.oculto)) mudancas.push(oculto ? 'ocultado do app' : 'voltou a aparecer no app');
+  if (preco !== null) mudancas.push(`preço: ${preco} ${preco === 1 ? 'crédito' : 'créditos'} por música`);
   registrarLogCd(cd.id, titulo, 'editado', mudancas.join('; ') || null);
 
   emitirTodos('lancamentos');
@@ -301,6 +339,18 @@ router.put('/musicas/:id/oculta', (req, res) => {
   res.json({ sucesso: true, oculta: Boolean(oculta) });
 });
 
+// Preço de uma música só (exceção ao preço do CD).
+router.put('/musicas/:id/preco', (req, res) => {
+  const musica = db.prepare('SELECT m.id, m.titulo, m.cd_id, c.titulo AS cd FROM musicas m JOIN cds c ON c.id = m.cd_id WHERE m.id = ?').get(req.params.id);
+  if (!musica) throw new ErroApi(404, 'Música não encontrada');
+
+  const preco = validarPreco(req.body?.creditos);
+  db.prepare('UPDATE musicas SET creditos = ? WHERE id = ?').run(preco, musica.id);
+  registrarLogCd(musica.cd_id, musica.cd, 'editado', `música "${musica.titulo}": ${preco} ${preco === 1 ? 'crédito' : 'créditos'}`);
+  emitirTodos('top');
+  res.json({ sucesso: true, creditos: preco });
+});
+
 router.post('/acervo/ocultar-sem-arquivo', (req, res) => {
   const ocultadas = sistema.ocultarSemArquivo();
   if (ocultadas) {
@@ -351,6 +401,219 @@ router.put('/regras', (req, res) => {
   res.json(regras);
 });
 
+// ---------- Saúde (alimenta os avisos fixos do painel) ----------
+
+router.get('/saude', (req, res) => {
+  const estado = player.estado();
+  res.json({
+    player: { backend: estado.backend, simulado: estado.backend === 'sim', vinheta: estado.vinheta },
+    telas: telasConectadas(),
+    telegram: telegram.configurado(),
+    recados_pendentes: db.prepare("SELECT COUNT(*) AS n FROM recados WHERE status = 'pendente'").get().n,
+  });
+});
+
+// ---------- Volume parelho ----------
+
+router.get('/volume-parelho', (req, res) => {
+  res.json(volumeParelho.resumo());
+});
+
+router.put('/volume-parelho', (req, res) => {
+  const { ativa, alvo } = req.body ?? {};
+  configuracoes.salvarNormalizacao({ ativa, alvo });
+  if (ativa) volumeParelho.agendarAnalise(); // ligou: mede o que ainda não foi medido (se houver ffmpeg)
+  res.json(volumeParelho.resumo());
+});
+
+router.post('/volume-parelho/analisar', (req, res) => {
+  volumeParelho.iniciarAnalise();
+  res.status(202).json(volumeParelho.resumo());
+});
+
+router.post('/volume-parelho/cancelar', (req, res) => {
+  volumeParelho.cancelarAnalise();
+  res.json(volumeParelho.resumo());
+});
+
+// ---------- Vinhetas de áudio ----------
+
+router.get('/vinhetas', (req, res) => {
+  res.json({ config: configuracoes.lerVinhetas(), vinhetas: vinhetas.listar() });
+});
+
+router.put('/vinhetas/config', (req, res) => {
+  res.json({ config: configuracoes.salvarVinhetas(req.body ?? {}) });
+});
+
+router.post('/vinhetas', enviarVinheta, async (req, res) => {
+  if (!req.file) throw new ErroApi(400, 'Escolha o arquivo de áudio da vinheta.');
+  try {
+    const vinheta = await vinhetas.criar({ titulo: req.body?.titulo, arquivoTemporario: req.file.path, nomeOriginal: req.file.originalname });
+    res.status(201).json(vinheta);
+  } finally {
+    apagarArquivo(req.file.path); // se deu erro, o temporário ainda está lá; se deu certo, já foi movido
+  }
+});
+
+router.put('/vinhetas/:id', (req, res) => {
+  res.json(vinhetas.alternar(req.params.id, Boolean(req.body?.ativa)));
+});
+
+router.delete('/vinhetas/:id', (req, res) => {
+  vinhetas.remover(req.params.id);
+  res.json({ sucesso: true });
+});
+
+// O painel baixa o áudio com o token e toca no navegador (para o dono conferir o que enviou).
+router.get('/vinhetas/:id/audio', (req, res) => {
+  const caminho = vinhetas.caminhoAbsoluto(vinhetas.obter(req.params.id));
+  if (!caminho) throw new ErroApi(404, 'O arquivo desta vinheta sumiu.');
+  res.sendFile(caminho);
+});
+
+// ---------- Cartazes do monitor ----------
+
+router.get('/cartazes', (req, res) => {
+  res.json({ config: configuracoes.lerCartazes(), cartazes: cartazes.listar() });
+});
+
+router.put('/cartazes/config', (req, res) => {
+  const ajustes = configuracoes.salvarCartazes(req.body ?? {});
+  emitirTodos('cartazes');
+  res.json({ config: ajustes });
+});
+
+router.post('/cartazes', enviarCartaz, (req, res) => {
+  if (!req.file) throw new ErroApi(400, 'Escolha a imagem do cartaz.');
+  try {
+    const cartaz = cartazes.criar({ ...req.body, arquivoTemporario: req.file.path, nomeOriginal: req.file.originalname });
+    emitirTodos('cartazes');
+    res.status(201).json(cartaz);
+  } finally {
+    apagarArquivo(req.file.path);
+  }
+});
+
+router.put('/cartazes/:id', (req, res) => {
+  const cartaz = cartazes.atualizar(req.params.id, req.body ?? {});
+  emitirTodos('cartazes');
+  res.json(cartaz);
+});
+
+router.delete('/cartazes/:id', (req, res) => {
+  cartazes.remover(req.params.id);
+  emitirTodos('cartazes');
+  res.json({ sucesso: true });
+});
+
+// ---------- Recados no telão ----------
+
+router.get('/recados', (req, res) => {
+  res.json(recados.listarAdmin());
+});
+
+router.put('/recados/config', (req, res) => {
+  const ajustes = configuracoes.salvarRecados(req.body ?? {});
+  emitirTodos('config'); // os celulares mostram ou escondem o botão de recado
+  res.json({ config: ajustes });
+});
+
+router.post('/recados/:id/aprovar', (req, res) => {
+  recados.aprovar(req.params.id);
+  res.json({ sucesso: true });
+});
+
+router.post('/recados/:id/recusar', (req, res) => {
+  recados.recusar(req.params.id);
+  res.json({ sucesso: true });
+});
+
+// ---------- Vales-música ----------
+
+router.get('/vales', (req, res) => {
+  res.json({ lotes: vales.listarLotes() });
+});
+
+router.post('/vales', (req, res) => {
+  const lote = vales.gerarLote(req.body ?? {});
+  res.status(201).json({ ...lote, codigos: lote.codigos.map(vales.formatarCodigo) });
+});
+
+router.get('/vales/:lote', (req, res) => {
+  res.json({ vales: vales.codigosDoLote(req.params.lote) });
+});
+
+router.get('/vales/:lote/qrs', async (req, res) => {
+  res.json({ cartoes: await vales.qrsDoLote(req.params.lote) });
+});
+
+router.delete('/vales/:lote', (req, res) => {
+  res.json({ revogados: vales.revogarLote(req.params.lote) });
+});
+
+// ---------- Músicas da internet (yt-dlp) ----------
+
+router.get('/youtube', async (req, res) => {
+  res.json(await sobdemanda.situacao());
+});
+
+router.put('/youtube/config', async (req, res) => {
+  res.json({ config: await sobdemanda.salvarConfig(req.body ?? {}) });
+});
+
+router.post('/youtube/verificar', async (req, res) => {
+  await youtube.verificar();
+  res.json(await sobdemanda.situacao());
+});
+
+// Baixa a versão mais nova do próprio yt-dlp (o YouTube muda e o programa precisa acompanhar).
+router.post('/youtube/atualizar', async (req, res) => {
+  try {
+    res.json({ atualizacao: await youtube.atualizar(), ...(await sobdemanda.situacao()) });
+  } catch (erro) {
+    throw new ErroApi(502, `Não consegui atualizar o yt-dlp: ${erro.message}`);
+  }
+});
+
+// ---------- Avisos no Telegram ----------
+
+router.get('/alertas', (req, res) => {
+  res.json({
+    telegram: { token: Boolean(config.telegram.token), configurado: telegram.configurado(), boate_configurada: telegram.boateConfigurada() },
+    alertas: configuracoes.lerAlertas(),
+    fechamento: configuracoes.lerFechamento(),
+    ultimo_fechamento: configuracoes.lerConfig('fechamento_ultimo') || null,
+  });
+});
+
+router.put('/alertas', (req, res) => {
+  const { alertas: tipos, fechamento: ajusteFechamento } = req.body ?? {};
+  res.json({
+    alertas: configuracoes.salvarAlertas(tipos ?? {}),
+    fechamento: configuracoes.salvarFechamento(ajusteFechamento ?? {}),
+  });
+});
+
+router.post('/alertas/teste', async (req, res) => {
+  const para = req.body?.destino === 'boate' ? 'boate' : 'dono';
+  res.json(await telegram.enviar(`✅ Teste da ${config.nomeLocal}: o Telegram está funcionando.`, { para }));
+});
+
+// Manda já o fechamento das últimas 24 h (para conferir como a mensagem chega).
+router.post('/alertas/fechamento', async (req, res) => {
+  const resultado = await fechamento.enviarFechamento(fechamento.periodoQueTermina(new Date()), { incluirBoate: Boolean(req.body?.boate) });
+  res.json({ dono: resultado.dono, boate: resultado.boate });
+});
+
+router.get('/alertas/conversas', async (req, res) => {
+  try {
+    res.json({ conversas: await telegram.descobrirConversas() });
+  } catch (erro) {
+    throw new ErroApi(502, `Não consegui falar com o Telegram: ${erro.message}`);
+  }
+});
+
 // ---------- Sugestões dos clientes ----------
 
 router.get('/sugestoes', (req, res) => {
@@ -398,16 +661,10 @@ router.get('/relatorio.csv', (req, res) => {
 // ---------- Estatísticas ----------
 
 // `creditos` do histórico é só a parte paga (base da divisão com a boate); `cortesia` é a gratuita.
+// Recado que foi ao ar entra no faturamento como a música tocada.
 function resumoDesde(desdeIso) {
-  const { tocadas, bruto, gratis } = db.prepare(`
-    SELECT COUNT(*) AS tocadas, COALESCE(SUM(creditos), 0) AS bruto, COALESCE(SUM(cortesia), 0) AS gratis
-      FROM historico_reproducao WHERE tocado_em >= ?
-  `).get(desdeIso);
-  const { arrecadado } = db.prepare(
-    "SELECT COALESCE(SUM(valor), 0) AS arrecadado FROM pagamentos WHERE status = 'confirmado' AND confirmado_em >= ?",
-  ).get(desdeIso);
-  const usuario = (bruto * config.divisaoUsuario) / 100;
-  return { tocadas, bruto, usuario, boate: bruto - usuario, arrecadado, cortesia: gratis };
+  const r = relatorio.resumoPeriodo(desdeIso, new Date(Date.now() + 60_000).toISOString());
+  return { tocadas: r.tocadas, bruto: r.bruto, usuario: r.usuario, boate: r.boate, arrecadado: r.arrecadado, cortesia: r.cortesia, recados: r.recados };
 }
 
 const diaLocal = (data) => data.toLocaleDateString('sv-SE');
@@ -425,12 +682,18 @@ router.get('/stats', (req, res) => {
     SELECT date(tocado_em, 'localtime') AS dia, COUNT(*) AS tocadas, SUM(creditos) AS valor
       FROM historico_reproducao WHERE tocado_em >= ? GROUP BY dia
   `).all(quinzena.toISOString()).map((linha) => [linha.dia, linha]));
+  const recadosPorDia = new Map(recados.totaisPorDia(quinzena.toISOString(), new Date(Date.now() + 60_000).toISOString())
+    .map((linha) => [linha.dia, linha]));
 
   const serie = Array.from({ length: 14 }, (_, i) => {
     const dia = new Date(quinzena);
     dia.setDate(quinzena.getDate() + i);
     const chave = diaLocal(dia);
-    return { dia: chave, tocadas: porDia.get(chave)?.tocadas ?? 0, valor: porDia.get(chave)?.valor ?? 0 };
+    return {
+      dia: chave,
+      tocadas: porDia.get(chave)?.tocadas ?? 0,
+      valor: (porDia.get(chave)?.valor ?? 0) + (recadosPorDia.get(chave)?.bruto ?? 0),
+    };
   });
 
   res.json({
