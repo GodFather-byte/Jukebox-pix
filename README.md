@@ -21,6 +21,8 @@ Em desenvolvimento o pagamento é **simulado** (`PAYMENT_PROVIDER=mock`): a tela
 
 > **Guia das funcionalidades novas** (preço por CD, bônus por horário, recado no telão, vale-música, vinhetas e cartazes, volume parelho, alertas no Telegram, músicas da internet): [docs/NOVAS-FUNCIONALIDADES.md](docs/NOVAS-FUNCIONALIDADES.md).
 
+> **Hospedar na internet** (Docker, Render, túnel Cloudflare): [docs/HOSPEDAGEM.md](docs/HOSPEDAGEM.md).
+
 Para mexer no frontend com recarga automática: `npm start` num terminal e `npm run dev:web` em outro (abre em `:5173`).
 
 ## Colocando na boate

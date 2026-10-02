@@ -35,6 +35,20 @@ validarConfig();
 
 const app = express();
 app.disable('x-powered-by');
+if (config.confiarProxy) app.set('trust proxy', 1);
+app.use((req, res, next) => {
+  res.set({
+    'X-Content-Type-Options': 'nosniff',
+    'X-Frame-Options': 'SAMEORIGIN',
+    'Referrer-Policy': 'same-origin',
+  });
+  next();
+});
+// Verificação de saúde para hospedagens (Render, Railway, Docker, uptime monitors).
+app.get('/healthz', (req, res) => {
+  db.prepare('SELECT 1').get();
+  res.json({ ok: true });
+});
 app.use(express.json({ limit: '100kb' }));
 
 app.use('/api/categorias', categoriasRoutes);
@@ -88,7 +102,7 @@ iniciarSobDemanda(); // devolve o que ficou "preparando" numa queda e confere o 
 iniciarVigia();
 agendarAnalise(); // volume parelho ligado: mede em segundo plano o que ainda não foi medido
 
-const servidor = app.listen(config.porta, '0.0.0.0', () => {
+const servidor = app.listen(config.porta, config.host, () => {
   console.log(`\n🎵 ${config.nomeLocal} no ar`);
   console.log(`   Clientes (celular):  ${urlDoApp()}`);
   console.log(`   Monitor:             http://localhost:${config.porta}/tela`);
