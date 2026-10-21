@@ -3,6 +3,7 @@ import path from 'node:path';
 import express from 'express';
 import { config, validarConfig } from './config.js';
 import { db } from './database.js';
+import { encerrarEventos } from './events.js';
 import { ErroApi } from './erros.js';
 import * as player from './player.js';
 import { iniciarCronLancamentos } from './crons/lancamentos.js';
@@ -14,7 +15,7 @@ import { capasDir } from './services/biblioteca.js';
 import { cartazesDir } from './services/cartazes.js';
 import { iniciarRecados } from './services/recados.js';
 import { iniciarSobDemanda } from './services/sobdemanda.js';
-import { agendarAnalise } from './services/volume.js';
+import { agendarAnalise, encerrarTudo as encerrarVolume } from './services/volume.js';
 import * as youtube from './services/youtube.js';
 import adminRoutes from './routes/admin.js';
 import artistasRoutes from './routes/artistas.js';
@@ -93,31 +94,77 @@ app.use((erro, req, res, next) => {
   res.status(500).json({ erro: 'Erro interno do servidor' });
 });
 
-const backendPlayer = player.iniciar();
-iniciarCronLancamentos();
-iniciarManutencao();
-iniciarBackups();
-iniciarRecados();
-iniciarSobDemanda(); // devolve o que ficou "preparando" numa queda e confere o yt-dlp (se o recurso estiver ligado)
-iniciarVigia();
-agendarAnalise(); // volume parelho ligado: mede em segundo plano o que ainda não foi medido
+let encerrando = false;
+const conexoes = new Set();
+const notificar = (mensagem) => process.parentPort?.postMessage(mensagem);
 
-const servidor = app.listen(config.porta, config.host, () => {
+export const servidor = app.listen(config.porta, config.host, (erro) => {
+  if (erro || encerrando) return;
+  let backendPlayer;
+  try {
+    db.prepare('SELECT 1').get();
+    config.porta = servidor.address().port;
+    backendPlayer = player.iniciar();
+    iniciarCronLancamentos();
+    iniciarManutencao();
+    iniciarBackups();
+    iniciarRecados();
+    iniciarSobDemanda();
+    iniciarVigia();
+    agendarAnalise();
+  } catch (erro) {
+    if (!process.parentPort) console.error(erro);
+    notificar({ type: 'startup-error', code: 'STARTUP_FAILED' });
+    encerrar(1);
+    return;
+  }
+  notificar({ type: 'ready', port: servidor.address().port, clientUrl: urlDoApp(), player: backendPlayer });
   console.log(`\n🎵 ${config.nomeLocal} no ar`);
   console.log(`   Clientes (celular):  ${urlDoApp()}`);
   console.log(`   Monitor:             http://localhost:${config.porta}/tela`);
   console.log(`   Admin:               http://localhost:${config.porta}/admin`);
   console.log(`   Pagamento: ${config.pagamento.provedor}${config.pagamento.provedor === 'mock' ? ' (MODO DE TESTE, créditos grátis)' : ''} | Player: ${backendPlayer}\n`);
 });
+servidor.on('connection', (socket) => {
+  conexoes.add(socket);
+  socket.once('close', () => conexoes.delete(socket));
+  if (encerrando) socket.destroy();
+});
+servidor.on('error', (erro) => {
+  if (!process.parentPort) console.error(erro);
+  notificar({ type: 'startup-error', code: erro.code === 'EADDRINUSE' ? 'EADDRINUSE' : 'STARTUP_FAILED' });
+  encerrar(1);
+});
 
-function encerrar() {
+export function encerrar(codigo = 0) {
+  if (encerrando) return;
+  encerrando = true;
+  clearTimeout(watchdog);
+  let finalizado = false;
+  const finalizar = () => {
+    if (finalizado) return;
+    finalizado = true;
+    clearTimeout(limite);
+    for (const socket of conexoes) socket.destroy();
+    try {
+      db.close();
+    } finally {
+      notificar({ type: 'stopped' });
+      process.exit(codigo);
+    }
+  };
+  const limite = setTimeout(finalizar, 3000);
   player.parar();
   youtube.encerrarTudo();
-  servidor.close(() => {
-    db.close();
-    process.exit(0);
-  });
-  setTimeout(() => process.exit(0), 3000).unref();
+  encerrarVolume();
+  encerrarEventos();
+  servidor.close(finalizar);
+  servidor.closeIdleConnections?.();
 }
-process.on('SIGINT', encerrar);
-process.on('SIGTERM', encerrar);
+process.on('SIGINT', () => encerrar());
+process.on('SIGTERM', () => encerrar());
+const watchdog = process.parentPort ? setTimeout(() => encerrar(), 10_000).unref() : null;
+process.parentPort?.on('message', (evento) => {
+  if (evento.data?.type === 'shutdown') encerrar();
+  if (evento.data?.type === 'heartbeat' && !encerrando) watchdog.refresh();
+});

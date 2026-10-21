@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { argumentosMpv, argumentosVlc, definirVolumeMpv, mpvSuportaIpc, novoCaminhoIpc } from './audio.js';
 import { config } from './config.js';
+import { encerrarArvore, opcoesSubprocesso } from './subprocessos.js';
 import { SESSAO_SISTEMA } from './database.js';
 import { emitirSessao, emitirTodos } from './events.js';
 import { avisar } from './services/alertas.js';
@@ -27,6 +28,7 @@ let recentes = [];
 let automaticoLivreEm = 0;
 let desdeVinheta = 0; // músicas tocadas desde a última vinheta
 let falhasSeguidas = 0;
+let encerrando = false;
 
 function comandoExiste(comando) {
   const r = spawnSync(comando, ['--version'], { stdio: 'ignore', timeout: 5000, windowsHide: true });
@@ -91,7 +93,7 @@ function vinhetaDevida() {
 }
 
 function tick() {
-  if (atual || pausado) return;
+  if (encerrando || atual || pausado) return;
   if (vinhetaDevida() && tocarVinheta()) return;
 
   let item = fila.proximo();
@@ -120,7 +122,7 @@ function tocarVinheta() {
   }
 
   atual.ipc = backend.tipo === 'mpv' && backend.ipc ? novoCaminhoIpc() : null;
-  const proc = spawn(backend.comando, argumentos(arquivo, atual.ipc), { stdio: 'ignore', windowsHide: true });
+  const proc = spawn(backend.comando, argumentos(arquivo, atual.ipc), { stdio: 'ignore', ...opcoesSubprocesso });
   atual.proc = proc;
   let encerrado = false;
   const fim = () => {
@@ -137,6 +139,7 @@ function tocarVinheta() {
 }
 
 function terminarVinheta() {
+  if (encerrando) return;
   clearTimeout(atual?.timer);
   atual = null;
   setImmediate(tick);
@@ -170,7 +173,7 @@ function tocar(item) {
   atual.ipc = backend.tipo === 'mpv' && backend.ipc ? novoCaminhoIpc() : null;
   const ganho = volumeParelho.ganhoParaItem(item); // volume parelho: dB a somar/subtrair nesta faixa (0 = desligado)
   const comecouEm = Date.now();
-  const proc = spawn(backend.comando, argumentos(arquivo, atual.ipc, ganho), { stdio: 'ignore', windowsHide: true });
+  const proc = spawn(backend.comando, argumentos(arquivo, atual.ipc, ganho), { stdio: 'ignore', ...opcoesSubprocesso });
   atual.proc = proc;
   let encerrado = false;
   const fim = (ok) => {
@@ -194,6 +197,7 @@ function tocar(item) {
 }
 
 function terminar(item, sucesso) {
+  if (encerrando) return;
   clearTimeout(atual?.timer);
   const automatica = atual?.automatica;
   atual = null;
@@ -217,6 +221,7 @@ function terminar(item, sucesso) {
 }
 
 export function iniciar() {
+  encerrando = false;
   backend = escolherBackend();
   fila.recuperarTocando();
   intervalo = setInterval(tick, 2000);
@@ -225,9 +230,11 @@ export function iniciar() {
 }
 
 export function parar() {
+  encerrando = true;
   clearInterval(intervalo);
   clearTimeout(atual?.timer);
-  atual?.proc?.kill();
+  encerrarArvore(atual?.proc);
+  atual = null;
 }
 
 // Aplica o volume gravado à música em andamento (só o mpv aceita mudança ao vivo; o resto vale na próxima faixa).
@@ -254,7 +261,7 @@ export function pular() {
     else terminar(atual.item, true);
   } else {
     atual.pulada = true;
-    atual.proc.kill();
+    encerrarArvore(atual.proc);
   }
   return true;
 }

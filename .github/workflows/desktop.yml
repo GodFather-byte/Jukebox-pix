@@ -1,0 +1,137 @@
+name: Desktop
+
+on:
+  pull_request:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    name: Build e smoke (${{ matrix.platform }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows
+            os: windows-latest
+            target: win
+          - platform: linux
+            os: ubuntu-24.04
+            target: linux
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            frontend/package-lock.json
+      - name: Validar versão da tag
+        if: github.ref_type == 'tag'
+        env:
+          REF: ${{ github.ref_name }}
+        run: |
+          node --input-type=module -e '
+            import fs from "node:fs";
+            const { version } = JSON.parse(fs.readFileSync("package.json", "utf8"));
+            if (process.env.REF !== `v${version}`) {
+              console.error("A tag deve ser v" + version);
+              process.exit(1);
+            }
+          '
+      - name: Dependências do Electron (Linux)
+        if: matrix.platform == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            xvfb xauth libgtk-3-0 libnss3 libasound2t64 libgbm1 \
+            libatk-bridge2.0-0 libdrm2 libxkbcommon0 libxcomposite1 \
+            libxdamage1 libxfixes3 libxrandr2
+      - name: Instalar dependências
+        run: |
+          npm ci
+          npm --prefix frontend ci
+      - name: Testes Node (antes da troca de ABI)
+        run: npm test
+      - name: Compilar frontend
+        run: npm run build
+      - name: Recompilar módulos nativos para Electron
+        run: npm run desktop:rebuild
+      - name: Empacotar para a plataforma nativa
+        run: npx --no-install electron-builder --${{ matrix.target }} --x64 --publish never
+      - name: Smoke do executável Windows
+        if: matrix.platform == 'windows'
+        run: node desktop/smoke.mjs "release/win-unpacked/Jukebox Pix.exe"
+      - name: Smoke do executável Linux
+        if: matrix.platform == 'linux'
+        run: xvfb-run -a node desktop/smoke.mjs release/linux-unpacked/jukebox-pix
+      - name: Instalador Windows
+        if: matrix.platform == 'windows'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: desktop-windows-x64
+          path: release/*.exe
+          if-no-files-found: error
+      - name: AppImage Linux
+        if: matrix.platform == 'linux'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: desktop-linux-x64-appimage
+          path: release/*.AppImage
+          if-no-files-found: error
+      - name: Pacote Debian Linux
+        if: matrix.platform == 'linux'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: desktop-linux-x64-deb
+          path: release/*.deb
+          if-no-files-found: error
+
+  release:
+    name: Publicar release da tag
+    if: github.event_name == 'push' && github.ref_type == 'tag'
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: desktop-*
+          path: release
+          merge-multiple: true
+      - name: Publicar instaladores
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          REF: ${{ github.ref_name }}
+        run: |
+          shopt -s nullglob
+          windows=(release/*.exe)
+          appimage=(release/*.AppImage)
+          debian=(release/*.deb)
+          if (( ${#windows[@]} == 0 || ${#appimage[@]} == 0 || ${#debian[@]} == 0 )); then
+            echo "Faltam instaladores obrigatórios; release cancelada." >&2
+            exit 1
+          fi
+          if ! gh release view "$REF" >/dev/null 2>&1; then
+            gh release create "$REF" --verify-tag --title "$REF" --generate-notes
+          fi
+          gh release upload "$REF" "${windows[@]}" "${appimage[@]}" "${debian[@]}" --clobber
