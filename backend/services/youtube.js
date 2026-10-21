@@ -4,6 +4,7 @@ import path from 'node:path';
 import { parseFile } from 'music-metadata';
 import { config } from '../config.js';
 import { emitirTodos } from '../events.js';
+import { encerrarArvore as matar, opcoesSubprocesso } from '../subprocessos.js';
 
 // Ponte com o yt-dlp (https://github.com/yt-dlp/yt-dlp), que o dono instala à parte. Este arquivo só fala com o
 // programa: pesquisar, ler os dados de um vídeo e baixar o áudio. Quem pode pedir, quanto custa e a fila ficam em sobdemanda.js.
@@ -56,29 +57,21 @@ function comando() {
   return /\.[cm]?js$/i.test(alvo) ? { exe: process.execPath, prefixo: [alvo] } : { exe: alvo, prefixo: [] };
 }
 
-// No Windows o yt-dlp.exe é um empacotador que roda o programa de verdade como processo filho:
-// matar só o pai deixaria o filho baixando. O taskkill /T derruba a árvore inteira.
-function matar(proc) {
-  if (!proc.pid) return;
-  if (process.platform === 'win32') {
-    spawn('taskkill', ['/PID', String(proc.pid), '/T', '/F'], { stdio: 'ignore', windowsHide: true }).on('error', () => proc.kill());
-  } else {
-    proc.kill('SIGKILL');
-  }
-}
-
 const emAndamento = new Set(); // processos do yt-dlp rodando agora
+let encerrando = false;
 
 // Ao desligar o servidor não deixa download nenhum rodando solto (nem arquivo pela metade).
 export function encerrarTudo() {
+  encerrando = true;
   for (const proc of emAndamento) matar(proc);
 }
 
 function executar(args, { tempoMs, maxSaida = SAIDA_MAX_BYTES }) {
   return new Promise((resolve, reject) => {
+    if (encerrando) return reject(new ErroYoutube('FALHOU', 'Servidor encerrando.'));
     const { exe, prefixo } = comando();
     const proc = spawn(exe, [...prefixo, ...args], {
-      windowsHide: true,
+      ...opcoesSubprocesso,
       stdio: ['ignore', 'pipe', 'pipe'],
       env: { ...process.env, PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8' },
     });

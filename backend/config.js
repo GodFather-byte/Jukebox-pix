@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 const raiz = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const env = process.env;
+const base = path.resolve(env.JUKEBOX_DATA_DIR || raiz);
 
 const num = (nome, padrao) => {
   const valor = env[nome];
@@ -12,7 +13,7 @@ const num = (nome, padrao) => {
   const n = Number(valor);
   return Number.isFinite(n) ? n : padrao;
 };
-const caminho = (nome, padrao) => path.resolve(raiz, env[nome] || padrao);
+const caminho = (nome, padrao) => path.resolve(base, env[nome] || padrao);
 // Separa por espaços, respeitando aspas: --cookies "C:\Minha Pasta\cookies.txt" vira dois argumentos, não quatro.
 const argumentos = (texto) => [...String(texto ?? '').matchAll(/"([^"]*)"|(\S+)/g)].map((m) => m[1] ?? m[2]);
 const musicasDir = caminho('MUSICAS_DIR', 'musicas');
@@ -30,7 +31,7 @@ export const config = {
   dbPath: caminho('DB_PATH', 'database/jukebox.db'),
   musicasDir,
   // Pasta onde você solta Artista/CD/faixas para importar vários CDs de uma vez.
-  importDir: env.IMPORT_DIR ? path.resolve(raiz, env.IMPORT_DIR) : path.join(musicasDir, '_importar'),
+  importDir: env.IMPORT_DIR ? path.resolve(base, env.IMPORT_DIR) : path.join(musicasDir, '_importar'),
   // Vinhetas de áudio e cartazes do monitor ficam dentro da pasta de músicas, em pastas com "_" (nunca viram CD).
   vinhetasDir: path.join(musicasDir, '_vinhetas'),
   cartazesDir: path.join(musicasDir, '_cartazes'),
@@ -38,7 +39,7 @@ export const config = {
   backupDir: caminho('BACKUP_DIR', 'backups'),
   backupManter: num('BACKUP_MANTER', 14), // quantos backups diários guardar
   // Segunda cópia de cada backup (pasta do OneDrive/Google Drive, pendrive, HD externo). Opcional.
-  backupCopiaDir: env.BACKUP_COPIA_DIR ? path.resolve(raiz, env.BACKUP_COPIA_DIR) : null,
+  backupCopiaDir: env.BACKUP_COPIA_DIR ? path.resolve(base, env.BACKUP_COPIA_DIR) : null,
 
   // 1 crédito = R$ 1,00
   valoresPix: [5, 10, 20, 50],

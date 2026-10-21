@@ -2,6 +2,76 @@
 
 Jukebox digital para boates: o cliente escaneia o QR code no monitor, paga via Pix pelo celular, escolhe a música e ela toca na hora. Tudo roda num notebook na própria casa; só a cobrança do Pix usa a internet.
 
+## Aplicativo desktop (Windows e Linux x64)
+
+### Instalação e primeiro uso
+
+Baixe o instalador `.exe` (Windows) ou `.AppImage`/`.deb` (Linux) em **Releases**. Em builds manuais ou de pull request, abra **Actions → Desktop → execução → Artifacts**, baixe e extraia o arquivo da sua plataforma. Artefatos de PR são builds de teste: confira a origem antes de executá-los. **Node.js só é necessário para desenvolvimento**, não para usar o aplicativo empacotado.
+
+- **Windows:** execute o instalador e abra **Jukebox Pix** pelo atalho criado pelo instalador. O executável não tem assinatura digital; o Windows/SmartScreen pode exibir um aviso de editor desconhecido. Não desative as proteções do sistema: use apenas arquivos de origem verificada.
+- **Linux:** para AppImage, dê permissão de execução (`chmod +x "arquivo.AppImage"`) e abra-o; algumas distribuições precisam instalar o suporte FUSE. Para Debian/Ubuntu, instale o `.deb` com `sudo apt install ./arquivo.deb` e abra pelo menu de aplicativos. A integração/atalho de AppImage depende do ambiente; mantenha o arquivo em um local permanente.
+- Instale **mpv ou VLC separadamente: um player real é obrigatório em produção**. ffmpeg (volume parelho) e yt-dlp (músicas da internet) são ferramentas externas opcionais; não acompanham o instalador.
+
+No primeiro uso, o diálogo oferece **Configurar produção**, **Experimentar em modo teste local** e **Cancelar**:
+
+- **Teste:** cria `.env` com `DESKTOP_MODE=teste`, senha e segredo aleatórios, acesso somente por loopback (`127.0.0.1`), pagamentos simulados e `PLAYER=sim` explícito. É preciso escolher **Continuar teste local** no aviso antes de iniciar. Não cobra Pix nem comprova saída de áudio real.
+- **Produção:** cria `.env` com `DESKTOP_MODE=producao`, senha e segredo aleatórios, `HOST=0.0.0.0`, `PAYMENT_PROVIDER=mercadopago` e `PLAYER=auto`. Abre o arquivo no editor associado e a pasta de dados, e **encerra sem iniciar o servidor**. Confira `ADMIN_PASSWORD` (forte, com **pelo menos 12 caracteres**), preserve `ADMIN_SECRET`, preencha `MERCADOPAGO_ACCESS_TOKEN`, instale mpv/VLC, salve e **reabra o aplicativo**. Configuração inválida impede a inicialização. Nunca distribua seu `.env` com o instalador.
+
+O modo é escolhido por **`DESKTOP_MODE`**, não por `NODE_ENV` no `.env`: o aplicativo força `NODE_ENV=development` em teste e `NODE_ENV=production` em produção. Para passar de teste a produção, feche o aplicativo e edite o `.env` existente: altere `DESKTOP_MODE=producao`, `PAYMENT_PROVIDER=mercadopago`, `HOST=0.0.0.0` e `PLAYER=auto` (ou `mpv`/`vlc` instalado), e preencha o token do Mercado Pago. **Preserve a senha e o segredo gerados** (`ADMIN_PASSWORD` e `ADMIN_SECRET`); não apague o `.env` para trocar de modo. Salve e reabra.
+
+No menu **Jukebox Pix**, use **Painel administrativo**, **Abrir telão** (`/tela`), **Endereço dos clientes / rede**, **Abrir pasta de dados e logs**, **Editar configuração (.env)**, **Sobre a configuração** e **Sair**. O menu **Exibir** oferece **Recarregar** e **Tela cheia**. Alterações de configuração valem na próxima abertura; feche o aplicativo antes de editar ou migrar dados.
+
+Use o endereço informado pelo aplicativo, não uma porta presumida. Em rede personalizada, configure também `PUBLIC_URL=http://IP:PORT` no `.env` (substitua pelo IP privado acessível aos celulares e pela porta de `PORT`), para gerar o endereço/QR correto; em teste, `PUBLIC_URL` é ignorado. Para clientes na mesma rede, permita manualmente a porta configurada **somente no perfil privado do firewall**; o aplicativo não cria regras nem abre portas no roteador. Não exponha o servidor, o admin ou o telão à internet.
+
+### Dados, atualização e migração
+
+Os dados ficam em `app.getPath('userData')`, com o nome **Jukebox Pix**: normalmente `%APPDATA%\Jukebox Pix` no Windows e `~/.config/Jukebox Pix` no Linux (pode variar com as configurações do sistema). Essa pasta contém `.env`, `database`, `musicas`, `backups` e `logs/desktop.log`. O `.env` inicial é criado com exclusividade (`wx`), sem sobrescrever configuração existente; o aplicativo **não executa seed automaticamente**. O log registra apenas eventos sanitizados, não senhas ou tokens; ainda assim revise-o antes de compartilhar.
+
+Não há **assinatura digital nem atualização automática** configuradas. Para atualizar, feche o aplicativo, faça backup da pasta de dados e instale/baixe a nova versão manualmente, preservando os dados. Não confunda a pasta do instalador com a pasta persistente.
+
+Para migrar uma instalação antiga: **pare o servidor antigo e feche o desktop**, faça uma cópia de segurança completa e copie manualmente `database`, `musicas` e `backups` para a pasta de dados do desktop. Só copie para um destino sem dados ou escolha explicitamente uma restauração; **não sobrescreva um banco nem um `.env` existente**. Revise o `.env` antigo manualmente (caminhos, senha, provedor e rede) em vez de substituí-lo às cegas. O backup do banco sozinho não inclui as músicas.
+
+### Desenvolvimento, builds nativos e CI
+
+Use **Node.js 24** para desenvolver o desktop, com **Electron 45.0.0** e **electron-builder 26.15.3** fixados no `package.json` (better-sqlite3 13). Instale as dependências do projeto e do frontend:
+
+```bash
+npm ci
+npm --prefix frontend ci
+npm test
+npm run build
+npm run desktop
+```
+
+`npm test` executa `node --test tests/*.test.js`. Rode os testes Node **antes** de `desktop:rebuild`, pois o módulo SQLite nativo troca de ABI ao ser recompilado para Electron. Para voltar a executar o backend/testes com Node após usar Electron, reinstale as dependências com `npm ci`.
+
+| Comando | Resultado |
+|---|---|
+| `npm run desktop:rebuild` | Executa `node node_modules/electron/install.js` para obter o runtime e `electron-builder install-app-deps` para recompilar módulos nativos |
+| `npm run desktop` | Recompila os módulos e abre `electron .` |
+| `npm run desktop:pack` | Compila o frontend e gera diretório desempacotado (`--dir --publish never`) |
+| `npm run desktop:dist` | Compila o frontend e gera instaladores (`--publish never`) |
+
+Saídas em `release/`; executáveis desempacotados: `release/win-unpacked/Jukebox Pix.exe` e `release/linux-unpacked/jukebox-pix`. Faça cada build no sistema correspondente: **Windows para Windows, Linux para Linux**, ambos x64; cross-compilation e macOS não fazem parte deste fluxo.
+
+No Electron 45, instalar o pacote npm não baixa automaticamente o runtime: use `npm run desktop:rebuild` (também executado por `npm run desktop`) antes de abrir ou empacotar. Referências oficiais: [Electron 45 — utilityProcess](https://github.com/electron/electron/blob/v45.0.0/docs/api/utility-process.md), usado para executar o backend separado do renderer, e [documentação do electron-builder](https://www.electron.build/) ([repositório oficial](https://github.com/electron-userland/electron-builder)). Consulte essas fontes via HTTPS; recursos suportados pelas ferramentas, como assinatura e atualização automática, não significam que estejam configurados neste projeto.
+
+O workflow `.github/workflows/desktop.yml` roda em PR, execução manual e push de tags `v*`, usando `windows-latest` e `ubuntu-24.04`. Instala dependências, roda testes Node antes da recompilação nativa, compila o frontend, empacota e chama `node desktop/smoke.mjs <executável>`, com `xvfb-run -a` no Linux. O smoke usa dados isolados, valida healthcheck/SQLite, carregamento do renderer e encerramento por IPC, persistência entre duas inicializações, porta ocupada e instância única. Ele verifica `smoke-result.json` com `ok: true` e saída zero. Se o ambiente CI Linux exigir `--no-sandbox`, a exceção deve ficar restrita ao smoke em CI; **não use essa opção na execução normal**.
+
+Cada formato obrigatório (`.exe`, `.AppImage`, `.deb`) tem upload separado que falha se o arquivo faltar. Execuções manuais e PRs só fornecem artifacts; **nunca publicam releases**. Para publicar, atualize a versão do `package.json` e envie a tag exatamente `v<versão>` (por exemplo, `v1.0.0` para versão `1.0.0`). A CI rejeita divergências e só publica após os dois builds/smokes passarem; apenas o job de release recebe permissão de escrita.
+
+Para gerar instaladores manualmente no GitHub: abra **Actions → Desktop → Run workflow**, escolha a branch e clique em **Run workflow**. Quando os dois jobs de build terminarem com sucesso, abra a execução e baixe os arquivos em **Artifacts**; extraia o ZIP antes de instalar. Isso não cria uma release.
+
+Para publicar uma versão já revisada e commitada, com `package.json` e lockfile atualizados, envie a branch e depois a tag correspondente (exemplo para versão `1.0.0`; não reutilize uma tag existente):
+
+```bash
+git push origin HEAD
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+O smoke está implementado na CI; isso **não significa que os instaladores tenham sido testados localmente**. Ele não valida SmartScreen, instalação/integração de atalhos, áudio físico, player externo, Pix real, firewall ou todas as distribuições Linux. Confira esses pontos no computador de operação antes de atender clientes.
+
 ## Início rápido (desenvolvimento)
 
 Requer Node 20+.

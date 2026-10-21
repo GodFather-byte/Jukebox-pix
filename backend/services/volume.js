@@ -5,6 +5,7 @@ import path from 'node:path';
 import { config } from '../config.js';
 import { db } from '../database.js';
 import { ErroApi } from '../erros.js';
+import { encerrarArvore, opcoesSubprocesso } from '../subprocessos.js';
 import * as configuracoes from './configuracoes.js';
 
 // Volume parelho: o ffmpeg mede o loudness (LUFS) de cada faixa uma vez e o player aplica um ganho
@@ -19,6 +20,8 @@ let ffmpegConhecido = null;
 let cacheAlvo = null;
 let analise = { rodando: false, feitas: 0, total: 0, falhas: 0, atual: null, ultima_falha: null, cancelar: false };
 let agendada = null;
+let encerrando = false;
+const processos = new Set();
 
 // ---------- ffmpeg ----------
 
@@ -51,11 +54,14 @@ export function lerJsonDoLoudnorm(texto) {
 
 export function medir(arquivo) {
   return new Promise((resolve, reject) => {
+    if (encerrando) return reject(new Error('Servidor encerrando.'));
     const argumentos = [
       '-hide_banner', '-nostats', '-threads', '1', '-i', arquivo, '-vn',
       '-af', 'loudnorm=I=-16:TP=-1.5:LRA=11:print_format=json', '-f', 'null', '-',
     ];
-    const proc = spawn(config.ffmpeg, argumentos, { stdio: ['ignore', 'ignore', 'pipe'], windowsHide: true });
+    const proc = spawn(config.ffmpeg, argumentos, { stdio: ['ignore', 'ignore', 'pipe'], ...opcoesSubprocesso });
+    processos.add(proc);
+    proc.once('close', () => processos.delete(proc));
     try { os.setPriority(proc.pid, os.constants.priority.PRIORITY_BELOW_NORMAL); } catch { /* sem permissão: segue normal */ }
 
     let saida = '';
@@ -63,7 +69,7 @@ export function medir(arquivo) {
       saida += pedaco;
       if (saida.length > 200_000) saida = saida.slice(-100_000);
     });
-    const limite = setTimeout(() => { proc.kill(); reject(new Error('tempo esgotado ao medir')); }, TEMPO_MAX_MEDICAO_MS);
+    const limite = setTimeout(() => { encerrarArvore(proc); reject(new Error('tempo esgotado ao medir')); }, TEMPO_MAX_MEDICAO_MS);
     proc.once('error', (erro) => { clearTimeout(limite); reject(erro); });
     proc.once('exit', (codigo) => {
       clearTimeout(limite);
@@ -157,7 +163,7 @@ async function processar() {
         analise.atual = musica.arquivo;
         try {
           const medido = await medir(path.resolve(config.musicasDir, musica.arquivo));
-          gravar.run(medido.lufs, medido.pico_db, musica.id);
+          if (!encerrando) gravar.run(medido.lufs, medido.pico_db, musica.id);
         } catch (erro) {
           analise.falhas += 1;
           analise.ultima_falha = `${musica.arquivo}: ${erro.message}`;
@@ -173,6 +179,7 @@ async function processar() {
 }
 
 export function iniciarAnalise() {
+  if (encerrando) return estadoDaAnalise();
   if (analise.rodando) return estadoDaAnalise();
   if (!ffmpegDisponivel().disponivel) {
     throw new ErroApi(409, 'O ffmpeg não foi encontrado. Instale (winget install Gyan.FFmpeg) ou aponte FFMPEG_PATH no .env e tente de novo.', 'SEM_FFMPEG');
@@ -190,6 +197,7 @@ export function cancelarAnalise() {
 // Chamado quando entram músicas novas: se o volume parelho está ligado e há ffmpeg, mede em segundo plano.
 // Nunca lança: cadastrar um CD não pode falhar por causa disso.
 export function agendarAnalise() {
+  if (encerrando) return;
   try {
     if (!configuracoes.lerNormalizacao().ativa) return;
     clearTimeout(agendada);
@@ -200,4 +208,11 @@ export function agendarAnalise() {
     }, 3000);
     agendada.unref?.();
   } catch { /* melhor esforço */ }
+}
+
+export function encerrarTudo() {
+  encerrando = true;
+  cancelarAnalise();
+  clearTimeout(agendada);
+  for (const proc of processos) encerrarArvore(proc);
 }
