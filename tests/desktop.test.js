@@ -12,6 +12,16 @@ function directory(t) {
   return dir;
 }
 
+test('readiness do desktop usa o mesmo elemento de montagem do frontend', () => {
+  const html = fs.readFileSync(new URL('../frontend/index.html', import.meta.url), 'utf8');
+  const frontend = fs.readFileSync(new URL('../frontend/src/main.jsx', import.meta.url), 'utf8');
+  const desktop = fs.readFileSync(new URL('../desktop/main.cjs', import.meta.url), 'utf8');
+  assert.ok(html.includes('<div id="raiz">'));
+  assert.ok(frontend.includes("document.getElementById('raiz')"));
+  assert.ok(desktop.includes(`.includes('<div id="raiz">')`));
+  assert.ok(desktop.includes('document.querySelector("#raiz")?.children.length'));
+});
+
 test('primeira execução exige escolha explícita, gera senha segura e não sobrescreve dados', (t) => {
   const dir = directory(t);
   assert.throws(() => createSettings(dir, 'outro'));

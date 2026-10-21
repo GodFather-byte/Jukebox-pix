@@ -167,7 +167,7 @@ async function run() {
       const health = await fetch(`${origin}/healthz`, { signal: AbortSignal.timeout(10000) });
       if (!health.ok || (await health.json()).ok !== true) throw new Error();
       const frontend = await fetch(`${origin}/admin`, { signal: AbortSignal.timeout(10000) });
-      if (!frontend.ok || !(await frontend.text()).includes('<div id="root">')) throw new Error();
+      if (!frontend.ok || !(await frontend.text()).includes('<div id="raiz">')) throw new Error();
       installMenu(origin, info, settings);
       mainWindow = windowFor(`${origin}/admin`, settings.test ? 'Jukebox Pix — MODO DE TESTE LOCAL' : 'Jukebox Pix');
       log('PRONTO');
@@ -177,7 +177,7 @@ async function run() {
             // Aguarda React montar; baixar index.html sozinho não valida a interface empacotada.
             let rendered = false;
             for (let attempt = 0; attempt < 100; attempt++) {
-              rendered = await mainWindow.webContents.executeJavaScript('Boolean(document.querySelector("#root")?.children.length)');
+              rendered = await mainWindow.webContents.executeJavaScript('Boolean(document.querySelector("#raiz")?.children.length)');
               if (rendered) break;
               await new Promise((resolve) => setTimeout(resolve, 100));
             }
