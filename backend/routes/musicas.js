@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { buscar, sugestoes, topTocadas } from '../services/catalogo.js';
+import { buscar, porIds, sugestoes, topTocadas } from '../services/catalogo.js';
 
 const router = Router();
 
@@ -16,6 +16,11 @@ router.get('/buscar', (req, res) => {
   const termo = String(req.query.q ?? '').slice(0, 80);
   const categoria = req.query.categoria ? String(req.query.categoria) : null;
   res.json({ resultados: buscar(termo, categoria) });
+});
+
+router.get('/por-ids', (req, res) => {
+  const ids = String(req.query.ids ?? '').split(',').slice(0, 30);
+  res.json({ musicas: porIds(ids) });
 });
 
 export default router;

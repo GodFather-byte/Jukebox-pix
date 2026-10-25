@@ -26,7 +26,7 @@ export default function Musicas() {
       </section>
 
       <ul className="lista-musicas">
-        {musicas.map((m) => <MusicaItem key={m.id} musica={m} mostrarCapa={false} />)}
+        {musicas.map((m, i) => <MusicaItem key={m.id} musica={m} numero={i + 1} mostrarCapa={false} />)}
       </ul>
     </>
   );

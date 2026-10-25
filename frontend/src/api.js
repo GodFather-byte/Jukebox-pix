@@ -32,6 +32,26 @@ export function formatarDuracao(segundos) {
   return `${m}:${s}`;
 }
 
+export function segundosRestantes(item, agora = Date.now()) {
+  if (!item?.fim_previsto_em) return null;
+  const ms = Date.parse(item.fim_previsto_em) - agora;
+  if (!Number.isFinite(ms)) return null;
+  return Math.max(0, Math.ceil(ms / 1000));
+}
+
+export function formatarRestante(segundos) {
+  if (segundos == null) return null;
+  const m = Math.floor(segundos / 60);
+  const s = String(segundos % 60).padStart(2, '0');
+  return `${m}:${s}`;
+}
+
+export function textoEspera(segundos) {
+  if (segundos == null) return '';
+  if (segundos < 45) return 'em instantes';
+  return `em ~${Math.max(1, Math.round(segundos / 60))} min`;
+}
+
 export const formatarReais = (valor) =>
   Number(valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 

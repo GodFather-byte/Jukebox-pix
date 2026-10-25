@@ -1,11 +1,35 @@
 import Capa from './Capa.jsx';
 import Progresso from './Progresso.jsx';
-import { formatarDuracao } from '../api.js';
+import { formatarDuracao, textoEspera } from '../api.js';
 import { useSessao } from '../context/Sessao.jsx';
 
-function textoEspera(segundos) {
-  if (segundos < 45) return 'em instantes';
-  return `em ~${Math.max(1, Math.round(segundos / 60))} min`;
+function ResumoMinhas({ atual, proximas }) {
+  const tocando = atual?.minha ? atual : null;
+  const esperando = proximas.filter((item) => item.minha);
+  if (!tocando && esperando.length === 0) return null;
+
+  if (tocando) {
+    return (
+      <div className="card sua-vez" role="status">
+        <span className="selo selo-rosa">SUA VEZ</span>
+        <strong>{tocando.musica.titulo}</strong>
+        <span>Está tocando agora no salão</span>
+      </div>
+    );
+  }
+
+  const primeira = esperando[0];
+  const posicao = proximas.findIndex((item) => item.id === primeira.id) + 1;
+  return (
+    <div className="card sua-vez" role="status">
+      <span className="selo selo-rosa">SUA VEZ</span>
+      <strong>{esperando.length === 1 ? 'Você tem 1 música na fila' : `Você tem ${esperando.length} músicas na fila`}</strong>
+      <span>
+        {posicao === 1 ? 'É a próxima' : `A próxima é a ${posicao}ª`}
+        {' · '}{textoEspera(primeira.espera_segundos)}{' · '}{primeira.musica.titulo}
+      </span>
+    </div>
+  );
 }
 
 // `limite` corta a lista (prévia na home); sem limite mostra a fila toda.
@@ -16,8 +40,10 @@ export default function Fila({ limite }) {
 
   return (
     <div className="fila">
+      <ResumoMinhas atual={atual} proximas={proximas} />
+
       {atual ? (
-        <div className="fila-agora card">
+        <div className={`fila-agora card ${atual.minha ? 'minha' : ''}`}>
           <span className="selo selo-ciano">▶ TOCANDO AGORA</span>
           <div className="fila-agora-corpo">
             <Capa capa={atual.musica.capa} icone={atual.musica.icone} cor={atual.musica.cor} titulo={atual.musica.cd} />
@@ -27,7 +53,7 @@ export default function Fila({ limite }) {
               <small>{atual.automatica ? '🎲 Playlist automática' : atual.casa ? '🏠 Pedido da casa' : `pedida por ${atual.minha ? 'você' : atual.quem}`}</small>
             </div>
           </div>
-          <Progresso item={atual} />
+          <Progresso item={atual} mostrarTempo />
         </div>
       ) : (
         <p className="vazio">Nada tocando agora. Escolha uma música! 🎶</p>
@@ -38,6 +64,7 @@ export default function Fila({ limite }) {
           {itens.map((item, i) => (
             <li key={item.id} className={`fila-item ${item.minha ? 'minha' : ''}`}>
               <span className="fila-pos mono">{i + 1}</span>
+              <Capa capa={item.musica.capa} icone={item.musica.icone} cor={item.musica.cor} titulo="" className="capa-pequena" />
               <div className="fila-item-info">
                 <strong>{item.prioridade ? '⚡ ' : ''}{item.musica.titulo}</strong>
                 <span>{item.musica.artista}</span>

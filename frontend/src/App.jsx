@@ -22,12 +22,18 @@ import Tela from './pages/Tela.jsx';
 import Top from './pages/Top.jsx';
 
 function Conteudo() {
-  const { sessao, erroConexao, tentarNovamente } = useSessao();
+  const { sessao, erroConexao, tentarNovamente, fila, conectado } = useSessao();
   const { pathname } = useLocation();
 
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [pathname]);
+
+  const tocando = fila.agora_tocando?.musica.titulo;
+  useEffect(() => {
+    document.title = tocando ? `${tocando} · Jukebox` : 'Jukebox';
+    return () => { document.title = 'Jukebox'; };
+  }, [tocando]);
 
   if (!sessao) {
     return (
@@ -46,8 +52,11 @@ function Conteudo() {
     <>
       <Avisos />
       <Header />
-      <AvisoPreparando />
-      <main className="conteudo"><Outlet /></main>
+      <div className="faixas-topo">
+        {!conectado && <div className="banner-offline" role="status">Sem conexão com a jukebox. A música do salão continua; esta tela atualiza quando o WiFi voltar.</div>}
+        <AvisoPreparando />
+      </div>
+      <main className={`conteudo ${fila.agora_tocando && pathname !== '/fila' ? '' : 'sem-player'}`}><Outlet /></main>
       <MiniPlayer />
       <NavInferior />
     </>
