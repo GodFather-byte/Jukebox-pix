@@ -56,7 +56,7 @@ function Conteudo() {
         {!conectado && <div className="banner-offline" role="status">Sem conexão com a jukebox. A música do salão continua; esta tela atualiza quando o WiFi voltar.</div>}
         <AvisoPreparando />
       </div>
-      <main className="conteudo"><Outlet /></main>
+      <main className={`conteudo ${fila.agora_tocando && pathname !== '/fila' ? '' : 'sem-player'}`}><Outlet /></main>
       <MiniPlayer />
       <NavInferior />
     </>

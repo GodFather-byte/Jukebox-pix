@@ -151,7 +151,7 @@ export default function Tela() {
 
         <div className="tela-agora">
           <div className="tela-agora-topo">
-            <span className="selo selo-ciano">▶ TOCANDO AGORA</span>
+            <span className="selo selo-ciano">{atual ? '▶ TOCANDO AGORA' : '♪ AGUARDANDO'}</span>
             {atual && (
               <span className="eq" aria-hidden="true"><span /><span /><span /><span /><span /></span>
             )}

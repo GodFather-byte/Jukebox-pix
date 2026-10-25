@@ -24,7 +24,10 @@ function ResumoMinhas({ atual, proximas }) {
     <div className="card sua-vez" role="status">
       <span className="selo selo-rosa">SUA VEZ</span>
       <strong>{esperando.length === 1 ? 'Você tem 1 música na fila' : `Você tem ${esperando.length} músicas na fila`}</strong>
-      <span>A próxima é a {posicao}ª · {textoEspera(primeira.espera_segundos)} · {primeira.musica.titulo}</span>
+      <span>
+        {posicao === 1 ? 'É a próxima' : `A próxima é a ${posicao}ª`}
+        {' · '}{textoEspera(primeira.espera_segundos)}{' · '}{primeira.musica.titulo}
+      </span>
     </div>
   );
 }
