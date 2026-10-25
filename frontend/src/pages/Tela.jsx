@@ -194,6 +194,7 @@ export default function Tela() {
               {fila.fila.slice(0, 6).map((item, i) => (
                 <li key={item.id} className={`fila-item ${i === 0 ? 'seguir' : ''}`}>
                   <span className="fila-pos mono">{i + 1}</span>
+                  <Capa capa={item.musica.capa} icone={item.musica.icone} cor={item.musica.cor} titulo="" className="capa-pequena" />
                   <div className="fila-item-info"><strong>{item.prioridade ? '⚡ ' : ''}{item.musica.titulo}</strong><span>{item.musica.artista}</span></div>
                   <small>{item.quem} · {textoEspera(item.espera_segundos)}</small>
                 </li>

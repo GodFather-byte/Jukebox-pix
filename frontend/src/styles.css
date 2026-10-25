@@ -861,7 +861,7 @@ p.bonus-futuro { margin: 0 0 12px; }
 .balcao {
   position: fixed; inset: 0; z-index: 55;
   display: flex; flex-direction: column;
-  background: rgba(10, 14, 39, 0.98);
+  background: #0A0E27;
 }
 .balcao-topo {
   display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
