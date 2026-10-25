@@ -103,7 +103,7 @@ export default function Internet({ chamar }) {
         <button className="btn btn-fantasma btn-pequeno" onClick={() => carregar().catch((e) => setMensagem({ tipo: 'erro', texto: e.message }))}>↻ Atualizar</button>
       </div>
       <p className="nota">
-        O cliente pesquisa qualquer música na internet (YouTube), paga com créditos e a jukebox baixa o áudio na hora e coloca na fila.
+        O cliente pesquisa qualquer música na internet (YouTube), paga com créditos e a jukebox baixa o áudio e a capa na hora e coloca na fila.
         Dá certo para músicas que você não tem no acervo. Fica <b>desligado</b> até você ligar abaixo.
       </p>
 

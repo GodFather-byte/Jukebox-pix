@@ -67,6 +67,7 @@ db.exec(`
     duracao INTEGER,
     creditos INTEGER NOT NULL DEFAULT 1,
     arquivo TEXT NOT NULL,
+    capa TEXT,
     oculta INTEGER NOT NULL DEFAULT 0,
     vezes_tocada INTEGER NOT NULL DEFAULT 0,
     criado_em TEXT NOT NULL
@@ -258,6 +259,8 @@ garantirColuna('musicas', 'lufs', 'REAL');
 garantirColuna('musicas', 'pico_db', 'REAL');
 // Música baixada da internet: guarda o ID do vídeo (evita baixar de novo) e marca de onde veio.
 garantirColuna('musicas', 'youtube_id', 'TEXT');
+// Capa desta faixa (arquivo em musicas/capas). Vazia: a tela usa a capa do CD.
+garantirColuna('musicas', 'capa', 'TEXT');
 db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_musicas_youtube ON musicas(youtube_id) WHERE youtube_id IS NOT NULL');
 
 // Vencimento em 2999: nunca é zerada nem apagada pelas rotinas de limpeza.

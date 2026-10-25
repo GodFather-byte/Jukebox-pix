@@ -17,10 +17,12 @@ function contagem(ms) {
   return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
 }
 
-export default function Pagar() {
+export default function Pagar({ embutido = false, aoEscolher, aoVoltar }) {
   const { sessao, saldo, atualizarSessao, config } = useSessao();
   const mostrarToast = useToast();
   const navigate = useNavigate();
+  const escolher = () => (embutido ? aoEscolher?.() : navigate('/'));
+  const voltar = () => (embutido ? (aoVoltar ?? aoEscolher)?.() : navigate('/'));
   const info = useApi('/info');
 
   const [valor, setValor] = useState(10);
@@ -111,7 +113,7 @@ export default function Pagar() {
         <p><b className="mono">+{pagamento.creditos}</b> créditos adicionados</p>
         {pagamento.bonus > 0 && <p className="bonus-destaque">🎁 + <b className="mono">{pagamento.bonus}</b> de bônus!</p>}
         <p>Saldo atual: <b className="mono">{saldo}</b></p>
-        <button className="btn btn-grande" onClick={() => navigate('/')}>ESCOLHER MÚSICAS</button>
+        <button className="btn btn-grande" onClick={escolher}>ESCOLHER MÚSICAS</button>
         <button className="btn btn-fantasma" onClick={novoPix}>Adicionar mais créditos</button>
       </section>
     );
@@ -124,7 +126,7 @@ export default function Pagar() {
         <section className="card pagamento-qr">
           <h1>Pague {formatarReais(pagamento.valor)} via Pix</h1>
           {pagamento.bonus > 0 && <p className="bonus-destaque">🎁 Você ganha + <b className="mono">{pagamento.bonus}</b> créditos de bônus</p>}
-          <p className="subtitulo">Abra o app do seu banco, escolha Pix → <b>Ler QR code</b> ou <b>Pix copia e cola</b>.</p>
+          <p className="subtitulo">Abra o app do seu banco e aponte a câmera para <b>este QR</b>. Dá para usar também o <b>Pix copia e cola</b>.</p>
           <QRCode imagem={pagamento.qr_imagem} texto={pagamento.qr_code} alt="QR code do Pix" />
           <p className="aguardando"><span className="carregando carregando-pequeno" /> Aguardando pagamento… expira em <b className="mono">{contagem(restante)}</b></p>
           {modoTeste && (
@@ -144,7 +146,7 @@ export default function Pagar() {
         <div className="pagamento-icone">🌙</div>
         <h1>Vendas encerradas</h1>
         <p>No momento não estamos vendendo créditos novos. Quem já tem créditos continua pedindo músicas normalmente.</p>
-        <button className="btn btn-grande" onClick={() => navigate('/')}>VOLTAR</button>
+        <button className="btn btn-grande" onClick={voltar}>{embutido ? 'VOLTAR AO TELÃO' : 'VOLTAR'}</button>
       </section>
     );
   }

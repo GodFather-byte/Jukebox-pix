@@ -72,8 +72,9 @@ export default function Home() {
         <small>{saldo > 0 ? `Vencem em ~${minutos} min sem uso · 1 crédito = R$ 1,00` : '1 crédito = R$ 1,00'}</small>
         {sessao?.saldo_cortesia > 0 && <small>🎁 {sessao.saldo_cortesia} de cortesia</small>}
         {config.vendas_abertas
-          ? <Link to="/pagar" className="btn btn-grande">PAGAR AGORA</Link>
+          ? <Link to="/pagar" className="btn btn-grande">PAGAR NESTA TELA</Link>
           : <span className="btn btn-grande btn-desativado">VENDAS ENCERRADAS</span>}
+        {config.vendas_abertas && <small className="pagar-na-tela">O QR do Pix abre aqui. Aponte a câmera do banco para esta tela.</small>}
         {config.vendas_abertas && config.bonus.ativo && config.bonus.faixas.length > 0 && (
           <small className="bonus-destaque">
             🎁 Bônus: {config.bonus.faixas.map((f) => `R$ ${f.valor} → +${f.bonus}`).join(' · ')}

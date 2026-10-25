@@ -25,6 +25,15 @@ export async function api(caminho, { metodo = 'GET', corpo, token } = {}) {
 
 export const capaUrl = (capa) => (capa ? `/capas/${capa}` : null);
 
+// No telão o pagamento abre por cima da tela. No celular, vai para a página de Pix.
+export function irParaPagamento(navigate) {
+  if (typeof window !== 'undefined' && window.location.pathname === '/tela') {
+    window.dispatchEvent(new Event('jukebox:pagar'));
+    return;
+  }
+  navigate('/pagar');
+}
+
 export function formatarDuracao(segundos) {
   if (!segundos) return '--:--';
   const m = Math.floor(segundos / 60);

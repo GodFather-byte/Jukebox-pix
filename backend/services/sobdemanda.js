@@ -12,7 +12,8 @@ import * as fila from './fila.js';
 import { creditar, debitar, obterSessao, rotulo } from './sessoes.js';
 import * as youtube from './youtube.js';
 
-// Música pedida pela internet. O cliente pesquisa, paga com créditos e a jukebox baixa o áudio (yt-dlp) e põe na fila.
+// Música pedida pela internet. O cliente pesquisa, paga com créditos e a jukebox baixa o áudio (yt-dlp),
+// a capa daquele vídeo, e põe na fila. Se a capa não vier, a música entra mesmo assim: o crédito não volta por causa dela.
 //
 // Dinheiro: o crédito é cobrado ao pedir, e o pedido guarda de onde saiu (pago ou cortesia). Se o download falhar,
 // travar ou o servidor cair, o crédito volta ao mesmo saldo. Depois de baixada, a música entra na fila já paga e
@@ -236,10 +237,22 @@ const acharNaCasa = (videoId) => db.prepare(`
   SELECT m.id, m.oculta, c.oculto FROM musicas m JOIN cds c ON c.id = m.cd_id WHERE m.youtube_id = ?
 `).get(videoId);
 
+const CAPA_SALVA = /^yt-[A-Za-z0-9_-]{11}\.(jpg|png|webp)$/;
+
+// Faixa antiga, baixada antes de existir capa por música: tenta a imagem sem segurar a fila.
+function completarCapa(videoId) {
+  youtube.baixarCapa(videoId).then((capa) => {
+    if (!capa || !CAPA_SALVA.test(capa)) return;
+    const mudou = db.prepare('UPDATE musicas SET capa = ? WHERE youtube_id = ? AND capa IS NULL').run(capa, videoId).changes;
+    if (mudou) emitirTodos('fila');
+  }).catch(() => {});
+}
+
 // Já baixada por alguém: é uma música como as outras (mesmas regras de fila e de preço).
-function entrarNaFilaDaCasa(sessionId, musica) {
+function entrarNaFilaDaCasa(sessionId, musica, videoId) {
   if (musica.oculta || musica.oculto) throw new ErroApi(409, 'Essa música não está disponível.', 'INDISPONIVEL');
   const { id, saldo } = fila.adicionar(sessionId, musica.id);
+  if (videoId && !db.prepare('SELECT capa FROM musicas WHERE id = ?').get(musica.id)?.capa) completarCapa(videoId);
   emitirTodos('fila');
   emitirSessao(sessionId, 'sessao', obterSessao(sessionId));
   acordar();
@@ -310,14 +323,14 @@ export async function comprar(sessionId, videoIdBruto, ip) {
   if (!videoId) throw new ErroApi(400, 'Música inválida.');
 
   const jaTem = acharNaCasa(videoId);
-  if (jaTem) return entrarNaFilaDaCasa(sessionId, jaTem);
+  if (jaTem) return entrarNaFilaDaCasa(sessionId, jaTem, videoId);
 
   // Sem saldo nem consulta ao yt-dlp: quem ainda não pagou não gasta a internet do notebook.
   if (obterSessao(sessionId).saldo < cfg.preco) throw new ErroApi(402, 'Saldo insuficiente. Adicione créditos para continuar.', 'SALDO_INSUFICIENTE');
   exigirEspaco();
   const dados = await dadosDoVideo(videoId, cfg, sessionId, ip);
   const reserva = reservar(sessionId, dados, cfg);
-  if (reserva.naCasa) return entrarNaFilaDaCasa(sessionId, reserva.naCasa);
+  if (reserva.naCasa) return entrarNaFilaDaCasa(sessionId, reserva.naCasa, videoId);
 
   const { pedido } = reserva;
   console.log(`[internet] preparando "${pedido.titulo}" (${pedido.video_id}) para ${rotulo(sessionId)}`);
@@ -351,19 +364,22 @@ function garantirCd() {
   return CD_ID;
 }
 
-const concluirNoBanco = db.transaction((pedidoId, arquivo) => {
+const concluirNoBanco = db.transaction((pedidoId, arquivo, capa) => {
   const pedido = db.prepare("SELECT * FROM pedidos_youtube WHERE id = ? AND status = 'baixando'").get(pedidoId);
   if (!pedido) return null; // já foi devolvido (passou do tempo ou o servidor reiniciou): não entra na fila
 
+  const capaSalva = CAPA_SALVA.test(capa) ? capa : null;
   let musica = db.prepare('SELECT id FROM musicas WHERE youtube_id = ?').get(pedido.video_id);
   const nova = !musica;
   if (nova) {
     const cdId = garantirCd();
     musica = { id: novoId() };
     db.prepare(`
-      INSERT INTO musicas (id, titulo, cd_id, duracao, creditos, arquivo, youtube_id, criado_em)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(musica.id, tituloDaMusica(pedido.titulo, pedido.canal), cdId, pedido.duracao, configuracoes.lerYoutube().preco, arquivo, pedido.video_id, agora());
+      INSERT INTO musicas (id, titulo, cd_id, duracao, creditos, arquivo, youtube_id, capa, criado_em)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(musica.id, tituloDaMusica(pedido.titulo, pedido.canal), cdId, pedido.duracao, configuracoes.lerYoutube().preco, arquivo, pedido.video_id, capaSalva, agora());
+  } else if (capaSalva) {
+    db.prepare('UPDATE musicas SET capa = ? WHERE id = ? AND capa IS NULL').run(capaSalva, musica.id);
   }
   db.prepare("UPDATE pedidos_youtube SET status = 'na_fila', musica_id = ?, atualizado_em = ? WHERE id = ?").run(musica.id, agora(), pedidoId);
   const filaId = fila.adicionarPaga(pedido.session_id, musica.id, { creditos: pedido.creditos, cortesia: pedido.creditos_cortesia });
@@ -387,8 +403,8 @@ function avisarCliente(pedido, status) {
 async function executarPedido(pedido, cfg) {
   const inicio = Date.now();
   try {
-    const { arquivo } = await prepararArquivo(pedido, cfg);
-    const resultado = concluirNoBanco(pedido.id, arquivo);
+    const { arquivo, capa } = await prepararArquivo(pedido, cfg);
+    const resultado = concluirNoBanco(pedido.id, arquivo, capa ?? null);
     registrarResultado('download');
     if (!resultado) return;
     console.log(`[internet] "${pedido.titulo}" pronta em ${((Date.now() - inicio) / 1000).toFixed(1)} s e na fila`);

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api, formatarDuracao } from '../api.js';
+import { api, formatarDuracao, irParaPagamento } from '../api.js';
 import Destaque from './Destaque.jsx';
 import { useSessao } from '../context/Sessao.jsx';
 import { useToast } from '../context/Toast.jsx';
@@ -102,7 +102,7 @@ export default function BuscaInternet({ termo }) {
       } else {
         mostrar(e.message, {
           tipo: 'erro',
-          acao: e.codigo === 'SALDO_INSUFICIENTE' ? { texto: 'PAGAR', aoClicar: () => navigate('/pagar') } : undefined,
+          acao: e.codigo === 'SALDO_INSUFICIENTE' ? { texto: 'PAGAR', aoClicar: () => irParaPagamento(navigate) } : undefined,
         });
       }
     } finally {
@@ -123,7 +123,7 @@ export default function BuscaInternet({ termo }) {
           <span className="internet-icone" aria-hidden="true">🌐</span>
           <div>
             <strong>Não achou? Pesquise na internet</strong>
-            <small>A música é baixada do YouTube na hora e entra na fila em cerca de 1 minuto · {config.youtube.preco} {config.youtube.preco === 1 ? 'crédito' : 'créditos'}</small>
+            <small>O áudio e a capa são baixados do YouTube na hora e a música entra na fila em cerca de 1 minuto · {config.youtube.preco} {config.youtube.preco === 1 ? 'crédito' : 'créditos'}</small>
           </div>
           <button className="btn btn-ciano" onClick={pesquisar}>🔎 PESQUISAR “{termo}”</button>
         </div>
