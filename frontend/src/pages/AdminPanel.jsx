@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, baixar, buscarArquivo } from '../api.js';
 import Alertas from './admin/Alertas.jsx';
+import AoVivo from './admin/AoVivo.jsx';
 import Biblioteca from './admin/Biblioteca.jsx';
 import Cadastros from './admin/Cadastros.jsx';
 import Console from './admin/Console.jsx';
@@ -135,6 +136,8 @@ export default function AdminPanel() {
           <button className="btn btn-pequeno" onClick={() => setAba('sistema')}>Ver detalhes</button>
         </div>
       )}
+
+      {aba !== 'player' && <AoVivo chamar={chamar} versao={versao} />}
 
       <nav className="abas" role="tablist">
         {ABAS.map(([chave, rotulo]) => (

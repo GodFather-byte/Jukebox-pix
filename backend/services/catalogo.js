@@ -124,22 +124,84 @@ export function sugestoes(quantidade = 4) {
   `).all(quantidade));
 }
 
+const escaparLike = (texto) => texto.replace(/[\\%_]/g, '\\$&');
+
 // Cada palavra da busca precisa aparecer em algum de: música, artista, CD ou categoria.
+// A ordem privilegia o título certo (e o artista certo) antes de "quem tocou mais":
+// uma música pouco tocada com o nome exato aparece na frente de um hit que só menciona a palavra.
 // `incluirOcultas` é só do admin (pra achar e reexibir o que ele escondeu).
 export function buscar(termo, categoriaId, { incluirOcultas = false } = {}) {
   const palavras = normalizar(termo).split(/\s+/).filter(Boolean).slice(0, 6);
   if (!palavras.length || palavras.join('').length < 2) return [];
 
-  const parametros = palavras.map((p) => `%${p.replace(/[\\%_]/g, '\\$&')}%`);
+  const frase = palavras.join(' ');
+  const fraseLike = escaparLike(frase);
+  const likes = palavras.map((p) => `%${escaparLike(p)}%`);
+  const pontosNoTitulo = palavras.map(() => `(CASE WHEN norm(m.titulo) LIKE ? ESCAPE '\\' THEN 18 ELSE 0 END)`).join(' + ');
+  const pontosNoArtista = palavras.map(() => `(CASE WHEN norm(a.nome) LIKE ? ESCAPE '\\' THEN 8 ELSE 0 END)`).join(' + ');
+  // "artista + música" (ex.: "chitaozinho evidencias"): o título igual a uma das palavras
+  // e o artista igual à outra sobem juntos, mesmo que a frase inteira não esteja no título.
+  const tituloIgualPalavra = palavras.map(() => `(CASE WHEN norm(m.titulo) = ? THEN 110 ELSE 0 END)`).join(' + ');
+  const artistaIgualPalavra = palavras.map(() => `(CASE WHEN norm(a.nome) = ? THEN 70 ELSE 0 END)`).join(' + ');
+  const relevancia = `
+    (CASE WHEN norm(m.titulo) = ? THEN 140 ELSE 0 END)
+    + (CASE WHEN norm(m.titulo) LIKE ? ESCAPE '\\' THEN 80 ELSE 0 END)
+    + (CASE WHEN norm(m.titulo) LIKE ? ESCAPE '\\' THEN 50 ELSE 0 END)
+    + (CASE WHEN norm(a.nome) = ? THEN 60 ELSE 0 END)
+    + (CASE WHEN norm(a.nome) LIKE ? ESCAPE '\\' THEN 24 ELSE 0 END)
+    + (CASE WHEN norm(c.titulo) = ? THEN 16 ELSE 0 END)
+    + ${pontosNoTitulo}
+    + ${pontosNoArtista}
+    + ${tituloIgualPalavra}
+    + ${artistaIgualPalavra}
+    + MIN(m.vezes_tocada, 12)
+  `;
+
   const condicoes = palavras.map(
     () => `norm(m.titulo || ' ' || a.nome || ' ' || c.titulo || ' ' || cat.nome) LIKE ? ESCAPE '\\'`,
   );
+  const parametros = [...likes];
   if (categoriaId) {
     condicoes.push('cat.id = ?');
     parametros.push(categoriaId);
   }
   if (!incluirOcultas) condicoes.push(VISIVEL);
 
-  return comPreco(db.prepare(`${MUSICA_SELECT} WHERE ${condicoes.join(' AND ')} ORDER BY m.vezes_tocada DESC, m.titulo LIMIT 60`)
-    .all(...parametros));
+  return comPreco(db.prepare(`
+    ${MUSICA_SELECT}
+     WHERE ${condicoes.join(' AND ')}
+     ORDER BY ${relevancia} DESC, m.vezes_tocada DESC, m.titulo
+     LIMIT 60
+  `).all(
+    ...parametros,
+    frase,
+    `${fraseLike}%`,
+    `%${fraseLike}%`,
+    frase,
+    `%${fraseLike}%`,
+    frase,
+    ...likes,
+    ...likes,
+    ...palavras,
+    ...palavras,
+  ));
+}
+
+// Favoritas do celular: devolve só o que ainda está visível, na ordem pedida.
+export function porIds(ids) {
+  const unicos = [];
+  for (const id of ids) {
+    if (typeof id !== 'string') continue;
+    const limpo = id.trim();
+    if (!limpo || limpo.length > 80 || unicos.includes(limpo)) continue;
+    unicos.push(limpo);
+    if (unicos.length >= 30) break;
+  }
+  if (!unicos.length) return [];
+
+  const linhas = comPreco(db.prepare(`
+    ${MUSICA_SELECT} WHERE m.id IN (${unicos.map(() => '?').join(',')}) AND ${VISIVEL}
+  `).all(...unicos));
+  const porId = new Map(linhas.map((m) => [m.id, m]));
+  return unicos.map((id) => porId.get(id)).filter(Boolean);
 }

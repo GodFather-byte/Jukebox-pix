@@ -40,6 +40,7 @@ export function SessaoProvider({ children }) {
   const [tentativa, setTentativa] = useState(0);
   // Músicas da internet que esta pessoa pediu e que ainda estão sendo baixadas (ainda não entraram na fila).
   const [preparando, setPreparando] = useState([]);
+  const [conectado, setConectado] = useState(true);
 
   useEffect(() => {
     let ativo = true;
@@ -77,8 +78,10 @@ export function SessaoProvider({ children }) {
   useEffect(() => {
     if (!sessionId) return undefined;
     const eventos = new EventSource(`/api/eventos?session_id=${sessionId}`);
+    let ativo = true;
+    let avisoQueda;
 
-    eventos.addEventListener('sessao', (e) => setSessao((s) => ({ ...s, ...JSON.parse(e.data) })));
+    eventos.addEventListener('sessao', (e) => { if (ativo) setSessao((s) => ({ ...s, ...JSON.parse(e.data) })); });
     for (const nome of ['fila', 'top', 'lancamentos', 'config']) {
       eventos.addEventListener(nome, () => setVersoes((v) => ({ ...v, [nome]: v[nome] + 1 })));
     }
@@ -96,12 +99,19 @@ export function SessaoProvider({ children }) {
     });
     // Ao reconectar (WiFi oscilou) pode ter perdido eventos: refaz tudo.
     eventos.onopen = () => {
+      if (!ativo) return;
+      clearTimeout(avisoQueda);
+      setConectado(true);
       setVersoes((v) => ({ fila: v.fila + 1, top: v.top + 1, lancamentos: v.lancamentos + 1, config: v.config + 1 }));
-      api(`/sessoes/${sessionId}`).then((s) => setSessao((atual) => ({ ...atual, ...s }))).catch(() => {});
+      api(`/sessoes/${sessionId}`).then((s) => { if (ativo) setSessao((atual) => ({ ...atual, ...s })); }).catch(() => {});
       recarregarPreparando();
     };
+    eventos.onerror = () => {
+      clearTimeout(avisoQueda);
+      avisoQueda = setTimeout(() => { if (ativo) setConectado(false); }, 2500);
+    };
 
-    return () => eventos.close();
+    return () => { ativo = false; clearTimeout(avisoQueda); eventos.close(); };
   }, [sessionId, recarregarPreparando]);
 
   // Rede de segurança: enquanto há música sendo baixada, confere de vez em quando (caso o aviso em tempo real se perca).
@@ -140,11 +150,12 @@ export function SessaoProvider({ children }) {
     config,
     erroConexao,
     preparando,
+    conectado,
     recarregarPreparando,
     adicionarMusica,
     tentarNovamente: () => setTentativa((n) => n + 1),
     atualizarSessao: (dados) => setSessao((s) => ({ ...s, ...dados })),
-  }), [sessao, fila, versoes, config, erroConexao, preparando, recarregarPreparando, adicionarMusica]);
+  }), [sessao, fila, versoes, config, erroConexao, preparando, conectado, recarregarPreparando, adicionarMusica]);
 
   return <SessaoContext.Provider value={valor}>{children}</SessaoContext.Provider>;
 }

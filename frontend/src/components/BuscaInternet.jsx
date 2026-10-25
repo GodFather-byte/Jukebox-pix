@@ -1,17 +1,18 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, formatarDuracao } from '../api.js';
+import Destaque from './Destaque.jsx';
 import { useSessao } from '../context/Sessao.jsx';
 import { useToast } from '../context/Toast.jsx';
 
-function Resultado({ item, estado, aoPedir }) {
+function Resultado({ item, estado, aoPedir, termo }) {
   const rotulo = estado === 'fila' ? '✔ NA FILA' : estado === 'preparando' ? '⏳ AGUARDE' : item.na_casa ? '+ ADICIONAR' : '🎶 PEDIR';
   return (
     <li className="musica musica-web">
       <img className="web-thumb" src={item.thumb} alt="" loading="lazy" width="72" height="40" />
       <div className="musica-info">
-        <strong>{item.titulo}</strong>
-        <span>{item.canal}</span>
+        <strong><Destaque texto={item.titulo} termo={termo} /></strong>
+        <span><Destaque texto={item.canal ?? ''} termo={termo} /></span>
         <small className="musica-meta">
           <span className="mono">{formatarDuracao(item.duracao)}</span>
           <span className="preco-tag" title="créditos cobrados por esta música">💰 {item.creditos} {item.creditos === 1 ? 'crédito' : 'créditos'}</span>
@@ -149,7 +150,7 @@ export default function BuscaInternet({ termo }) {
             ? <p className="vazio">Nada encontrado na internet para “{termo}”. Tente outras palavras.</p>
             : (
               <ul className="lista-musicas">
-                {dados.resultados.map((item) => <Resultado key={item.video_id} item={item} estado={estadoDe(item)} aoPedir={pedir} />)}
+                {dados.resultados.map((item) => <Resultado key={item.video_id} item={item} estado={estadoDe(item)} aoPedir={pedir} termo={termo} />)}
               </ul>
             )}
           <small className="nota">Só aparecem músicas de até {dados.max_min} minutos. Se o download falhar, os créditos voltam para você.</small>

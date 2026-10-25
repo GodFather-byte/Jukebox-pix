@@ -152,7 +152,7 @@ export default function Pagar() {
   return (
     <>
       <h1>Adicionar créditos</h1>
-      <p className="subtitulo">1 crédito = R$ 1,00 = 1 música. Pague com Pix e toque na hora.</p>
+      <p className="subtitulo">1 crédito = R$ 1,00. Pague com Pix e toque na hora.</p>
 
       {pagamento && <p className="aviso aviso-erro">Esse Pix expirou. Gere um novo para continuar.</p>}
 
@@ -166,7 +166,7 @@ export default function Pagar() {
         {valores.map((v) => (
           <button key={v} className={`valor ${outro === '' && valor === v ? 'ativo' : ''}`} onClick={() => { setValor(v); setOutro(''); }}>
             <b className="mono">R$ {v}</b>
-            <small>{v} músicas</small>
+            <small>{v} créditos</small>
             {bonusPara(v, config.bonus) > 0 && <span className="valor-bonus">🎁 +{bonusPara(v, config.bonus)} bônus</span>}
           </button>
         ))}
