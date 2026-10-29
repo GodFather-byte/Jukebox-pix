@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
+import { once } from 'node:events';
 import fs from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
@@ -12,10 +13,16 @@ const ambiente = (extras) => ({
   ...process.env, DOTENV_CONFIG_PATH: path.join(raiz, 'tests', '.env-inexistente'), DOTENV_CONFIG_QUIET: 'true',
   NODE_ENV: 'test', PLAYER: 'sim', PAYMENT_PROVIDER: 'mock', PUBLIC_URL: '', ...extras,
 });
-const pastaDeDados = (t) => {
+const novaPasta = () => {
   const pasta = path.join(raiz, 'tests', `.quiosque-${randomUUID()}`);
   fs.mkdirSync(pasta, { recursive: true });
-  t.after(() => fs.rmSync(pasta, { recursive: true, force: true }));
+  return pasta;
+};
+// No Windows o banco fica preso até o processo sair de vez: tenta apagar de novo por alguns instantes.
+const apagar = (pasta) => fs.rmSync(pasta, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
+const pastaDeDados = (t) => {
+  const pasta = novaPasta();
+  t.after(() => apagar(pasta));
   return pasta;
 };
 
@@ -29,10 +36,17 @@ async function portaLivre() {
 
 async function servidor(t, extras = {}) {
   const porta = await portaLivre();
+  const dados = novaPasta();
   const filho = spawn(process.execPath, ['backend/server.js'], {
-    cwd: raiz, env: ambiente({ JUKEBOX_DATA_DIR: pastaDeDados(t), HOST: '127.0.0.1', PORT: String(porta), ...extras }), stdio: 'ignore',
+    cwd: raiz, env: ambiente({ JUKEBOX_DATA_DIR: dados, HOST: '127.0.0.1', PORT: String(porta), ...extras }), stdio: 'ignore',
   });
-  t.after(() => filho.kill('SIGKILL'));
+  // Um passo só: o servidor sai de vez e só então a pasta (com o banco) é apagada.
+  const saiu = once(filho, 'exit');
+  t.after(async () => {
+    if (filho.exitCode === null && filho.signalCode === null) filho.kill('SIGKILL');
+    await saiu;
+    apagar(dados);
+  });
   const base = `http://127.0.0.1:${porta}`;
   for (let i = 0; i < 150; i++) {
     try { if ((await fetch(`${base}/healthz`, { signal: AbortSignal.timeout(2000) })).ok) break; } catch { /* subindo */ }
