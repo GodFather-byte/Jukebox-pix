@@ -27,6 +27,7 @@ let intervalo = null;
 let recentes = [];
 let automaticoLivreEm = 0;
 let silencioDesde = Date.now(); // quando a última música acabou (ou o player ligou)
+let chamadaFeita = false; // a vinheta de chamada já tocou antes da próxima aleatória
 let desdeVinheta = 0; // músicas tocadas desde a última vinheta
 let falhasSeguidas = 0;
 let encerrando = false;
@@ -71,8 +72,13 @@ function escolherBackend() {
   return { tipo: 'sim' };
 }
 
-function argumentos(arquivo, ipc, ganho = 0) {
-  const volume = configuracoes.lerVolume();
+// A aleatória toca mais baixo que a música paga (configurável no painel): quem quer a dele no volume cheio, paga.
+const volumeDe = (automatica) => (automatica
+  ? Math.round((configuracoes.lerVolume() * configuracoes.automaticoVolume()) / 100)
+  : configuracoes.lerVolume());
+
+function argumentos(arquivo, ipc, ganho = 0, automatica = false) {
+  const volume = volumeDe(automatica);
   return backend.tipo === 'mpv' ? argumentosMpv(arquivo, { volume, ipc, ganho }) : argumentosVlc(arquivo, { volume, ganho });
 }
 
@@ -102,9 +108,17 @@ function tick() {
   // Com intervalo, espera esse tempo de silêncio antes: a máquina "chama" o cliente sem tocar sem parar de graça.
   const intervaloMs = configuracoes.automaticoIntervaloMin() * 60_000;
   if (!item && Date.now() >= automaticoLivreEm && Date.now() - silencioDesde >= intervaloMs && configuracoes.automaticoAtivo()) {
-    item = fila.criarAutomatico(recentes, configuracoes.categoriasDaAutomatica());
+    // Antes da aleatória, uma vinheta de chamada ("coloque créditos e escolha a sua"), se o dono gravou alguma.
+    if (!chamadaFeita && configuracoes.automaticoVinheta() && vinhetas.haAtivas()) {
+      chamadaFeita = true;
+      if (tocarVinheta()) return;
+    }
+    item = fila.criarAutomatico(recentes, configuracoes.categoriasDaAutomatica(), { soTop: configuracoes.automaticoSoTop() });
   }
-  if (item) tocar(item);
+  if (item) {
+    chamadaFeita = false;
+    tocar(item);
+  }
 }
 
 // Vinheta: áudio do dono entre duas músicas. Não passa pela fila, não custa crédito e não entra em ranking nem faturamento.
@@ -176,7 +190,7 @@ function tocar(item) {
   atual.ipc = backend.tipo === 'mpv' && backend.ipc ? novoCaminhoIpc() : null;
   const ganho = volumeParelho.ganhoParaItem(item); // volume parelho: dB a somar/subtrair nesta faixa (0 = desligado)
   const comecouEm = Date.now();
-  const proc = spawn(backend.comando, argumentos(arquivo, atual.ipc, ganho), { stdio: 'ignore', ...opcoesSubprocesso });
+  const proc = spawn(backend.comando, argumentos(arquivo, atual.ipc, ganho, atual.automatica), { stdio: 'ignore', ...opcoesSubprocesso });
   atual.proc = proc;
   let encerrado = false;
   const fim = (ok) => {
@@ -245,7 +259,7 @@ export function parar() {
 // Aplica o volume gravado à música em andamento (só o mpv aceita mudança ao vivo; o resto vale na próxima faixa).
 export async function aplicarVolume() {
   if (!atual?.ipc) return false;
-  return definirVolumeMpv(atual.ipc, configuracoes.lerVolume());
+  return definirVolumeMpv(atual.ipc, volumeDe(atual.automatica));
 }
 
 // Chamado quando alguém entra na fila. Se está tocando uma aleatória e o dono pediu pra cortá-la,

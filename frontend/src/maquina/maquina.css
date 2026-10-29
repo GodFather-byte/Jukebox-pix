@@ -61,6 +61,8 @@
 .pn-proximas { display: flex; flex-direction: column; gap: 0.4vh; min-width: 0; padding-left: 1.4vw; border-left: 1px solid var(--linha); }
 .pn-proximas span { font-size: 1.8vh; color: #e6e1ff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pn-baixando { color: var(--ouro) !important; }
+.pn-tocando-texto small.pn-gratis { color: var(--ouro); animation: pn-piscar 1.4s ease-in-out infinite; }
+@keyframes pn-piscar { 50% { opacity: 0.45; } }
 .pn-saldo {
   display: flex; flex-direction: column; justify-content: center; align-items: center; min-width: 17vh; padding: 0 1.6vw;
   border-radius: 2vh; border: 0.3vh solid var(--ouro);

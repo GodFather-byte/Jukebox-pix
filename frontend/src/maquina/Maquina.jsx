@@ -63,7 +63,9 @@ function Topo({ nome }) {
           <>
             <Capa capa={atual.musica.capa} icone={atual.musica.icone} cor={atual.musica.cor} titulo={atual.musica.cd} className="pn-tocando-capa" />
             <div className="pn-tocando-texto">
-              <small>TOCANDO AGORA</small>
+              {atual.automatica
+                ? <small className="pn-gratis">🎲 TOCANDO DE GRAÇA · ESCOLHA A PRÓXIMA!</small>
+                : <small>TOCANDO AGORA</small>}
               <b>{atual.musica.titulo}</b>
               <span>{atual.musica.artista}</span>
               <Progresso item={atual} mostrarTempo />

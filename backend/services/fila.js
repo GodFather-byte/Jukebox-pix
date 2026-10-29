@@ -172,12 +172,17 @@ export const remover = db.transaction((id) => {
 // Sorteia uma música para tocar quando ninguém pediu nada, evitando as tocadas há pouco.
 // A faixa entra na fila como pertencente à sessão interna (sem custo).
 // `categorias` limita o sorteio ([] = qualquer uma); se a restrição não achar nada, sorteia de todas.
-export function criarAutomatico(recentes = [], categorias = []) {
+const TOP_DA_CASA = 40; // "mais tocadas" para a aleatória: as 40 com mais reproduções
+
+export function criarAutomatico(recentes = [], categorias = [], { soTop = false } = {}) {
   // Músicas baixadas da internet só entram no sorteio se o dono permitiu (padrão: não).
   const comInternet = configuracoes.lerYoutube().automatica;
-  const sortear = (evitar, apenas) => {
+  const sortear = (evitar, apenas, top = false) => {
     const condicoes = [VISIVEL];
     if (!comInternet) condicoes.push('m.youtube_id IS NULL');
+    if (top) {
+      condicoes.push(`m.vezes_tocada > 0 AND m.id IN (SELECT id FROM musicas ORDER BY vezes_tocada DESC LIMIT ${TOP_DA_CASA})`);
+    }
     const parametros = [];
     if (evitar.length) {
       condicoes.push(`m.id NOT IN (${evitar.map(() => '?').join(',')})`);
@@ -192,7 +197,10 @@ export function criarAutomatico(recentes = [], categorias = []) {
        WHERE ${condicoes.join(' AND ')} ORDER BY RANDOM() LIMIT 1
     `).get(...parametros);
   };
-  const musica = sortear(recentes, categorias) ?? sortear([], categorias) ?? sortear([], []);
+  // Só as mais tocadas, se pedido. Se todas já tocaram há pouco (ou a casa é nova, sem histórico), sorteia do
+  // acervo: repetir a mesma "mais tocada" toda hora cansa mais do que tocar uma qualquer.
+  const musica = (soTop && sortear(recentes, categorias, true))
+    || sortear(recentes, categorias) || sortear([], categorias) || sortear([], []);
   if (!musica) return null;
 
   const { proxima } = db.prepare('SELECT COALESCE(MAX(posicao), 0) + 1 AS proxima FROM fila').get();

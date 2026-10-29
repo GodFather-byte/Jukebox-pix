@@ -15,6 +15,9 @@ toque/botões físicos. Próxima meta do dono: **piloto na boate**.
   Com valor > 0 volta a vencer como antes.
 - Playlist automática espera 5 min de silêncio antes de cada aleatória: chave `automatico_intervalo_min`
   (`backend/services/configuracoes.js`, `backend/player.js`), seletor na aba Player do painel. 0 = sem pausa.
+- Aleatória que chama o cliente (chaves `automatico_so_top`, `automatico_volume`, `automatico_vinheta`): sorteia entre
+  as 40 mais tocadas (`fila.criarAutomatico`), toca a 80% do volume (`player.js` `volumeDe`), vinheta de chamada
+  antes (`chamadaFeita` em `player.js`) e a tela mostra "Tocando de graça" (`Maquina.jsx`, `atual.automatica`).
 - "Abrir o jukebox ao ligar o computador": caixa na tela de configuração (`INICIAR_COM_SISTEMA` no `.env`),
   aplicada em `desktop/inicio-automatico.cjs` (Windows: login item; Linux: `~/.config/autostart`).
 

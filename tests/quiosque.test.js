@@ -169,3 +169,38 @@ test('playlist automática espera o intervalo de silêncio antes de sortear', { 
   // Zero: toca na hora, como antes.
   assert.deepEqual(rodar(t, codigo(0), {}, dados), { tocando: true, intervalo: 0 });
 });
+
+test('aleatória: sorteia entre as mais tocadas, sem repetir a recente; padrões de volume e vinheta', { timeout: 60_000 }, (t) => {
+  const dados = pastaDeDados(t);
+  const seed = spawnSync(process.execPath, ['backend/seed.js'], { cwd: raiz, env: ambiente({ JUKEBOX_DATA_DIR: dados }), encoding: 'utf8', timeout: 30_000 });
+  assert.equal(seed.status, 0, seed.stderr);
+  const saida = rodar(t, `
+    const fila = await import('./backend/services/fila.js');
+    const configuracoes = await import('./backend/services/configuracoes.js');
+    const { db } = await import('./backend/database.js');
+    db.prepare('UPDATE musicas SET vezes_tocada = 0').run();
+    const [a, b] = db.prepare('SELECT id FROM musicas ORDER BY rowid LIMIT 2').all().map((m) => m.id);
+    db.prepare('UPDATE musicas SET vezes_tocada = 50 WHERE id IN (?, ?)').run(a, b);
+    const sorteadas = new Set();
+    for (let i = 0; i < 20; i++) {
+      const item = fila.criarAutomatico([], [], { soTop: true });
+      sorteadas.add(item.musica_id);
+      db.prepare('DELETE FROM fila WHERE id = ?').run(item.id);
+    }
+    // Com as duas top tocadas há pouco, cai no acervo em vez de repetir.
+    const semRepetir = fila.criarAutomatico([a, b], [], { soTop: true }).musica_id;
+    const padroes = configuracoes.lerAutomatico();
+    let recusou = false;
+    try { configuracoes.salvarAutomatico({ volume: 10 }); } catch { recusou = true; }
+    console.log(JSON.stringify({
+      soTop: [...sorteadas].every((id) => id === a || id === b),
+      semRepetir: semRepetir !== a && semRepetir !== b,
+      padroes: { so_top: padroes.so_top, volume: padroes.volume, vinheta: padroes.vinheta, intervalo: padroes.intervalo_min },
+      recusou,
+    }));
+    db.close();
+  `, {}, dados);
+  assert.deepEqual(saida, {
+    soTop: true, semRepetir: true, padroes: { so_top: true, volume: 80, vinheta: true, intervalo: 5 }, recusou: true,
+  });
+});
