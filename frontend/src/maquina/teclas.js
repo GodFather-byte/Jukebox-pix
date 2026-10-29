@@ -1,14 +1,15 @@
 // Botões da máquina. Os botões físicos ficam ligados numa placa que imita um teclado (encoder de fliperama ou
-// Arduino), então cada botão é uma tecla. Várias teclas por botão para servir às placas mais comuns.
+// Arduino), então cada botão é uma tecla. Só teclas de controle, para as letras ficarem livres na busca.
 export const TECLAS = {
-  ritmo: ['r', 'R', 'Home', 'F1'],
-  anterior: ['ArrowLeft', 'a', 'A', 'PageUp'],
-  proxima: ['ArrowRight', 'd', 'D', 'PageDown'],
-  descer: ['ArrowDown', 's', 'S'],
-  subir: ['ArrowUp', 'w', 'W'],
-  tocar: ['Enter', ' ', 't', 'T', 'NumpadEnter'],
-  creditos: ['c', 'C', 'Insert', 'F2'],
-  voltar: ['Escape', 'Backspace'],
+  ritmo: ['Home', 'F1'],
+  anterior: ['ArrowLeft', 'PageUp'],
+  proxima: ['ArrowRight', 'PageDown'],
+  descer: ['ArrowDown'],
+  subir: ['ArrowUp'],
+  tocar: ['Enter', ' ', 'NumpadEnter'],
+  creditos: ['Insert', 'F2'],
+  internet: ['F3'],
+  voltar: ['Escape', 'Backspace', 'End'],
 };
 
 const PORTECLA = new Map(Object.entries(TECLAS).flatMap(([botao, teclas]) => teclas.map((t) => [t, botao])));

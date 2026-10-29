@@ -14,38 +14,42 @@ Baixe o instalador `.exe` (Windows) ou `.AppImage`/`.deb` (Linux) em **Releases*
 
 No primeiro uso abre a **tela de configuração**, sem precisar editar arquivo:
 
-- **Atender clientes (produção):** nome do local, senha do painel (já vem uma sugerida, com pelo menos **12 caracteres**) e o **Access Token** do Mercado Pago, com botão **Testar**. A tela mostra se o player, o ffmpeg e o yt-dlp foram encontrados. Ao salvar, o jukebox já abre pronto. Por baixo grava o `.env` com `DESKTOP_MODE=producao`, `HOST=0.0.0.0`, `PAYMENT_PROVIDER=mercadopago` e `PLAYER=auto`, e um `ADMIN_SECRET` aleatório.
+- **Atender clientes (produção):** nome do local, senha do painel (já vem uma sugerida, com pelo menos **12 caracteres**) e o **Access Token** do Mercado Pago, com botão **Testar**. A tela mostra se o player, o ffmpeg e o yt-dlp foram encontrados. Ao salvar, o jukebox já abre pronto. Por baixo grava o `.env` com `DESKTOP_MODE=producao`, `HOST=127.0.0.1`, `PAYMENT_PROVIDER=mercadopago` e `PLAYER=auto`, e um `ADMIN_SECRET` aleatório.
 - **Só experimentar (teste):** créditos grátis, player simulado e acesso só por `127.0.0.1`. Não cobra Pix nem comprova saída de áudio real.
 
 Para mudar depois: menu **Jukebox Pix → Configurações…**. Ao salvar, o aplicativo reinicia com os valores novos. Token em branco mantém o que já estava, e ajustes feitos à mão no `.env` (`PLAYER=vlc`, `HOST`, Telegram etc.) continuam valendo. Se o `.env` estiver inválido, a mesma tela abre mostrando o problema. Nunca distribua seu `.env` com o instalador.
 
 O modo é escolhido por **`DESKTOP_MODE`**, não por `NODE_ENV` no `.env`: o aplicativo força `NODE_ENV=development` em teste e `NODE_ENV=production` em produção. Para passar de teste a produção, use **Jukebox Pix → Configurações…**, escolha **Atender clientes** e cole o token do Mercado Pago: rede, provedor e player mudam juntos, e a senha e o `ADMIN_SECRET` continuam os mesmos. Não apague o `.env` para trocar de modo.
 
-Ao abrir, o aplicativo mostra a **tela da máquina de música**, no estilo das jukebox de bar:
+Ao abrir, o aplicativo mostra a **tela da jukebox** ("palco neon"):
 
-- **Em cima e embaixo:** as capas dos CDs vizinhos, sobre barras coloridas de equalizador.
-- **No meio:** as faixas do CD escolhido.
-- **À direita:** a capa grande do CD, com o número dele.
-- **À esquerda:** "Ouvindo a música" e quantas músicas estão na fila.
-- **Nos cantos:** o disco com o **ritmo** (gênero) e a caixa de **créditos**.
+- **Topo:** a música tocando, com capa e progresso, as próximas da fila e os **créditos**.
+- **Faixa de ritmos:** Todos, Lançamentos, os gêneros e **Internet** (quando ligada no painel).
+- **Meio:** carrossel de capas em 3D, com o CD escolhido no centro.
+- **Embaixo:** o número e o nome do CD, as faixas em duas colunas e os botões da máquina desenhados (também dá para tocar neles).
 
-**Botões da máquina.** Cada botão físico é uma tecla: ligue os botões numa placa que imita teclado, como um encoder de fliperama ou um Arduino.
+**Botões da máquina.** Cada botão físico é uma tecla: ligue os botões numa placa que imita teclado, como um encoder de fliperama ou um Arduino. Só teclas de controle, para as letras ficarem livres na busca.
 
 | Botão | Teclas | O que faz |
 |---|---|---|
-| RITMO | `R`, `Home`, `F1` | troca o gênero (Todos, Lançamentos, Forró…) |
-| PÁGINA ANTERIOR | `←`, `A`, `PageUp` | CD anterior |
-| PRÓXIMA PÁGINA | `→`, `D`, `PageDown` | próximo CD |
-| ↓ | `↓`, `S` (e `↑`, `W` para subir) | desce na lista de faixas |
-| TOCAR | `Enter`, `Espaço`, `T` | põe a faixa escolhida na fila |
-| CRÉDITOS | `C`, `Insert`, `F2` | abre a tela de créditos |
+| RITMO | `Home`, `F1` | troca o gênero |
+| PÁGINA ANTERIOR | `←`, `PageUp` | CD anterior |
+| PRÓXIMA PÁGINA | `→`, `PageDown` | próximo CD |
+| ↓ / ↑ | `↓` / `↑` | anda na lista de faixas |
+| TOCAR | `Enter`, `Espaço` | põe a faixa escolhida na fila |
+| CRÉDITOS | `Insert`, `F2` | abre a tela de créditos |
+| INTERNET | `F3` | abre a busca no YouTube |
+| VOLTAR | `Esc`, `End` | fecha a janela aberta |
 
-Com **toque**:
-- toque numa capa para escolher o CD;
-- toque numa faixa para escolher e toque de novo para tocar;
-- toque no disco para trocar o ritmo e na caixa de créditos para pagar.
+Com **toque**: toque numa capa para escolher o CD, numa faixa para escolher e de novo para tocar, num ritmo para trocar de gênero.
 
 **Sem crédito:** o TOCAR abre a tela de créditos (Dinheiro, Pix, Cartão débito ou crédito). Ela usa os mesmos botões: ↓ escolhe, ◀ ▶ muda o valor, TOCAR confirma e RITMO volta.
+
+**Músicas da internet** (YouTube), quando o dono liga na aba *Internet* do painel:
+1. Escolha o ritmo **Internet** (ou aperte `F3`) e TOCAR.
+2. Escreva o nome no teclado da tela: ◀ ▶ ▼ escolhem a tecla e TOCAR aperta. Um teclado de verdade também funciona.
+3. Escolha o resultado e aperte TOCAR duas vezes para confirmar.
+4. A música e a capa são baixadas e a música entra na fila sozinha. Se o download falhar, o crédito volta.
 
 No menu **Jukebox Pix** há **Tela do jukebox**, **Painel administrativo** (outra janela, para não tirar o cliente da tela), **Abrir telão (2º monitor)** (`/telao`), **Configurações…**, **Abrir pasta de dados e logs**, **Editar configuração avançada (.env)**, **Sobre a configuração** e **Sair**. O menu **Exibir** oferece **Recarregar** e **Tela cheia**. Alterações de configuração valem na próxima abertura; feche o aplicativo antes de editar ou migrar dados.
 

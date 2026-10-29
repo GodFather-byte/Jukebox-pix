@@ -205,14 +205,14 @@ export default function Pagamento({ controle, aoFechar }) {
   }
 
   return (
-    <div className="mq-pg-fundo" role="dialog" aria-modal="true" aria-label="Colocar créditos">
-      <section className="mq-pg">
+    <div className="pn-janela-fundo" role="dialog" aria-modal="true" aria-label="Colocar créditos">
+      <section className="pn-janela mq-pg">
         <header>
           <h1>COLOCAR CRÉDITOS</h1>
           <span>1 crédito = 1 música = R$ 1,00{quiosque.modo_teste ? ' · MODO TESTE' : ''}</span>
-          <button type="button" className="mq-pg-fechar" aria-label="Fechar" onClick={voltar}>✕</button>
+          <button type="button" className="pn-fechar" aria-label="Fechar" onClick={voltar}>✕</button>
         </header>
-        {erro && <p className="mq-pg-erro" role="alert">{erro}</p>}
+        {erro && <p className="pn-erro" role="alert">{erro}</p>}
         {corpo}
       </section>
     </div>
