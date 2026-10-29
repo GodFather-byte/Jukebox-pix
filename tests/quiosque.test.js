@@ -63,6 +63,9 @@ async function servidor(t, extras = {}) {
 
 test('jukebox: uma sessão só, nota e cartão creditam nela, e túnel/proxy fica de fora', { timeout: 30_000 }, async (t) => {
   const { base, api } = await servidor(t);
+  // A máquina lista o acervo todo numa chamada só (banco novo: vazio).
+  assert.deepEqual((await api('/cds')).dados, { cds: [] });
+
   const { dados: q } = await api('/quiosque');
   assert.deepEqual(q.metodos, { pix: true, cartao: true, nota: true });
   const sessao = q.sessao.id;

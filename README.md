@@ -1,6 +1,6 @@
 # 🎵 Jukebox Pix
 
-Jukebox digital para boates, em aplicativo de Windows e Linux. **Tudo acontece na tela do jukebox**, com visual no estilo Spotify / YouTube Music: o cliente coloca créditos com **Pix** (o QR abre na própria tela), **cartão de débito ou crédito** (maquininha Mercado Pago Point) ou **dinheiro** (noteiro), e escolhe a música ali mesmo, com teclado na tela. O celular do cliente não acessa o jukebox. Tudo roda num computador na própria casa; só o Pix e o cartão usam a internet.
+Jukebox digital para boates, em aplicativo de Windows e Linux. **Tudo acontece na tela da máquina**, no estilo das jukebox de bar (capas, lista de faixas, botões RITMO / PÁGINA / TOCAR): o cliente coloca créditos com **Pix** (o QR abre na própria tela), **cartão de débito ou crédito** (maquininha Mercado Pago Point) ou **dinheiro** (noteiro), e escolhe a música pelos botões da máquina ou tocando na tela. O celular do cliente não acessa o jukebox. Tudo roda num computador na própria casa; só o Pix e o cartão usam a internet.
 
 ## Aplicativo desktop (Windows e Linux x64)
 
@@ -21,15 +21,31 @@ Para mudar depois: menu **Jukebox Pix → Configurações…**. Ao salvar, o apl
 
 O modo é escolhido por **`DESKTOP_MODE`**, não por `NODE_ENV` no `.env`: o aplicativo força `NODE_ENV=development` em teste e `NODE_ENV=production` em produção. Para passar de teste a produção, use **Jukebox Pix → Configurações…**, escolha **Atender clientes** e cole o token do Mercado Pago: rede, provedor e player mudam juntos, e a senha e o `ADMIN_SECRET` continuam os mesmos. Não apague o `.env` para trocar de modo.
 
-Ao abrir, o aplicativo mostra a **tela do jukebox**:
+Ao abrir, o aplicativo mostra a **tela da máquina de música**, no estilo das jukebox de bar:
 
-- **Menu na lateral:** Início, Buscar, Gêneros, Mais tocadas e Fila, e o saldo com o botão **Colocar créditos**.
-- **Fila à direita:** o que toca agora e o que vem a seguir.
-- **Barra embaixo:** a música tocando.
-- **Colocar créditos:** abre a escolha entre Pix, Cartão e Dinheiro.
-- **Teclado na tela:** aparece sozinho na busca, no recado e no vale.
-- **Descanso:** depois de 90 s sem toque, a tela volta ao início e mostra a música tocando em tamanho grande, os cartazes e o convite "toque na tela".
-- **Saldo:** todo crédito cai no saldo do jukebox, que é o mesmo para quem chegar na tela, como numa jukebox de bar.
+- **Em cima e embaixo:** as capas dos CDs vizinhos, sobre barras coloridas de equalizador.
+- **No meio:** as faixas do CD escolhido.
+- **À direita:** a capa grande do CD, com o número dele.
+- **À esquerda:** "Ouvindo a música" e quantas músicas estão na fila.
+- **Nos cantos:** o disco com o **ritmo** (gênero) e a caixa de **créditos**.
+
+**Botões da máquina.** Cada botão físico é uma tecla: ligue os botões numa placa que imita teclado, como um encoder de fliperama ou um Arduino.
+
+| Botão | Teclas | O que faz |
+|---|---|---|
+| RITMO | `R`, `Home`, `F1` | troca o gênero (Todos, Lançamentos, Forró…) |
+| PÁGINA ANTERIOR | `←`, `A`, `PageUp` | CD anterior |
+| PRÓXIMA PÁGINA | `→`, `D`, `PageDown` | próximo CD |
+| ↓ | `↓`, `S` (e `↑`, `W` para subir) | desce na lista de faixas |
+| TOCAR | `Enter`, `Espaço`, `T` | põe a faixa escolhida na fila |
+| CRÉDITOS | `C`, `Insert`, `F2` | abre a tela de créditos |
+
+Com **toque**:
+- toque numa capa para escolher o CD;
+- toque numa faixa para escolher e toque de novo para tocar;
+- toque no disco para trocar o ritmo e na caixa de créditos para pagar.
+
+**Sem crédito:** o TOCAR abre a tela de créditos (Dinheiro, Pix, Cartão débito ou crédito). Ela usa os mesmos botões: ↓ escolhe, ◀ ▶ muda o valor, TOCAR confirma e RITMO volta.
 
 No menu **Jukebox Pix** há **Tela do jukebox**, **Painel administrativo** (outra janela, para não tirar o cliente da tela), **Abrir telão (2º monitor)** (`/telao`), **Configurações…**, **Abrir pasta de dados e logs**, **Editar configuração avançada (.env)**, **Sobre a configuração** e **Sair**. O menu **Exibir** oferece **Recarregar** e **Tela cheia**. Alterações de configuração valem na próxima abertura; feche o aplicativo antes de editar ou migrar dados.
 
