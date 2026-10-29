@@ -1,41 +1,30 @@
 # Handoff
-Atualizado por: Claude Code em 2026-10-29
+Atualizado por: ChatGPT/Codex em 2026-10-29 (branch `codex/testes-pagamento-idempotencia`)
 
 ## Objetivo atual
-Jukebox de bar completa no próprio computador da máquina: o cliente escolhe e paga só na tela
-(botões físicos como teclas + toque), com Pix, cartão (Mercado Pago Point) e dinheiro (noteiro),
-e pode pedir músicas do YouTube (áudio e capa baixados na hora).
+Jukebox de bar no computador da máquina: música por créditos, Pix, Point, noteiro, busca YouTube e tela por toque/botões físicos.
 
-## Feito nesta sessão (branch `claude/vibrant-faraday-etr6xs`, PR GodFather-byte/Jukebox-pix#9, ainda sem merge)
-- Instalador traz mpv/ffmpeg/yt-dlp; tela de configuração no lugar do `.env` (desktop/).
-- Servidor só atende o próprio computador; sessão única da máquina; cartão Point e noteiro serial.
-- Tela do cliente refeita 3 vezes a pedido do dono. Versão atual: `frontend/src/maquina/`, visual
-  "palco neon" (carrossel 3D de capas, faixa de ritmos, faixas em 2 colunas, botões desenhados embaixo).
-  O dono NÃO quer cópia da máquina da foto que mandou nem o estilo Spotify anterior.
-- Busca no YouTube pela máquina (`Internet.jsx`, teclado na tela navegável pelos botões). Testado com
-  `tests/yt-dlp-falso.js`: busca, confirma, baixa com capa e entra na fila.
+## Situação da equipe
+- O PR #9 do Claude Code já foi integrado na `main`. O instalador e a tela "palco neon" seguem aguardando teste prático e aprovação do dono antes da distribuição.
+- O PR #10 do ChatGPT/Codex permanece em rascunho, isolado da `main`: testes de pagamento Pix sem crédito duplicado.
+- Nenhum arquivo de implementação do Claude foi modificado nesta branch.
 
-## Próximo passo
-- Dono testar o instalador do CI (Actions → Desktop → Artifacts) e aprovar o visual. Merge só com OK dele.
-- Opcional: tela de descanso (sem uso por um tempo) e cartazes na tela da máquina.
+## Feito nesta sessão
+- Lidos `AGENTS.md`, `.ai/MAPA.md` e este handoff.
+- Criado `tests/pagamento-idempotencia.test.js`: confirmações repetidas não geram crédito extra; cancelar após confirmação preserva o saldo; confirmação tardia de cobrança já marcada como falha credita apenas uma vez.
+- Código enviado ao GitHub, mas execução do teste **não verificada**: ambiente local sem acesso à rede do GitHub e sem dependências do projeto.
 
-## Arquivos relevantes
-- `frontend/src/maquina/Maquina.jsx`: tela principal e navegação pelos botões.
-- `frontend/src/maquina/teclas.js`: mapa botão → tecla (só teclas de controle; letras livres na busca).
-- `frontend/src/maquina/Pagamento.jsx`, `Internet.jsx`, `maquina.css`.
-- `backend/services/pagamentos.js`, `gateways/point.js`, `noteiro.js`, `quiosque.js`, `catalogo.js` (`todosOsCds`).
+## Próximos passos
+1. Na branch do PR #10 executar `npm ci && npm --prefix frontend ci` e `node --test tests/pagamento-idempotencia.test.js`; depois `npm test`.
+2. Atualizar o PR #10 com a `main` atual (o PR #9 já foi integrado), resolver conflitos se houver e pedir revisão do diff ao Claude Code.
+3. Dono testar instalador do CI e equipamentos reais: Point, noteiro e encoder de botões.
+4. Não fazer merge nem distribuir versão sem validação dos testes e aprovação do dono.
 
-## Decisões e motivo
-- Botões físicos = teclas (encoder de fliperama/Arduino), sem driver próprio.
-- Ritmo guardado pelo id, não pelo índice: baixar da internet cria o gênero "Sob demanda" e mudaria a seleção.
-- Recado no telão e vale-música não têm tela no cliente agora (o painel ainda configura).
-
-## Pendências e armadilhas
-- Não testado com aparelho real: maquininha Point, noteiro/moedeiro, placa dos botões.
-- `npm run desktop:rebuild` troca o SQLite para o Electron; rode `npm ci` antes de `npm test` depois.
-- `styles.css` ainda tem estilos das telas antigas do cliente (só o painel e o telão usam esse arquivo).
-
-## Como rodar e testar
-`npm test` (26 testes). Tela em modo teste: `npm run build`, `npm run seed`,
-`PAYMENT_PROVIDER=mock PLAYER=sim npm start` e abrir http://localhost:3000.
-Para a internet em teste: `YTDLP_PATH=tests/yt-dlp-falso.js` e ligar na aba Internet do painel.
+## Arquivos e decisões importantes
+- Pix e cartões: `backend/services/pagamentos.js`, `backend/services/gateways/`.
+- Máquina: `frontend/src/maquina/`. Desktop: `desktop/`.
+- 1 crédito = R$ 1; nunca creditar pagamento real sem confirmação do provedor.
+- Servidor restrito à própria máquina; nunca expor rotas na rede.
+- O proprietário não quer estilo Spotify nem reprodução exata da máquina de referência.
+- Tela do cliente única; sem tela de celular.
+- `npm run desktop:rebuild` altera o SQLite para Electron: executar `npm ci` antes dos testes Node.
