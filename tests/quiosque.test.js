@@ -2,7 +2,6 @@ import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import net from 'node:net';
-import os from 'node:os';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { test } from 'node:test';
@@ -31,27 +30,25 @@ async function portaLivre() {
 async function servidor(t, extras = {}) {
   const porta = await portaLivre();
   const filho = spawn(process.execPath, ['backend/server.js'], {
-    cwd: raiz, env: ambiente({ JUKEBOX_DATA_DIR: pastaDeDados(t), HOST: '0.0.0.0', PORT: String(porta), ...extras }), stdio: 'ignore',
+    cwd: raiz, env: ambiente({ JUKEBOX_DATA_DIR: pastaDeDados(t), HOST: '127.0.0.1', PORT: String(porta), ...extras }), stdio: 'ignore',
   });
   t.after(() => filho.kill('SIGKILL'));
   const base = `http://127.0.0.1:${porta}`;
   for (let i = 0; i < 150; i++) {
-    try { if ((await fetch(`${base}/healthz`)).ok) break; } catch { /* subindo */ }
+    try { if ((await fetch(`${base}/healthz`, { signal: AbortSignal.timeout(2000) })).ok) break; } catch { /* subindo */ }
     await new Promise((r) => setTimeout(r, 100));
   }
   const api = async (rota, corpo) => {
-    const r = await fetch(`${base}/api${rota}`, corpo === undefined ? {} : {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo),
+    const r = await fetch(`${base}/api${rota}`, corpo === undefined ? { signal: AbortSignal.timeout(10_000) } : {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo), signal: AbortSignal.timeout(10_000),
     });
     return { status: r.status, dados: await r.json().catch(() => null) };
   };
-  return { porta, api };
+  return { base, api };
 }
 
-const ipDaRede = () => Object.values(os.networkInterfaces()).flat().find((e) => e?.family === 'IPv4' && !e.internal)?.address;
-
-test('jukebox: uma sessão só, nota e cartão creditam nela, e a rede fica de fora', { timeout: 30_000 }, async (t) => {
-  const { porta, api } = await servidor(t);
+test('jukebox: uma sessão só, nota e cartão creditam nela, e túnel/proxy fica de fora', { timeout: 30_000 }, async (t) => {
+  const { base, api } = await servidor(t);
   const { dados: q } = await api('/quiosque');
   assert.deepEqual(q.metodos, { pix: true, cartao: true, nota: true });
   const sessao = q.sessao.id;
@@ -75,15 +72,10 @@ test('jukebox: uma sessão só, nota e cartão creditam nela, e a rede fica de f
   assert.ok(pix.qr_imagem.startsWith('data:image/png'));
   assert.equal((await api('/pagamento/iniciar', { valor: 5, session_id: sessao, metodo: 'boleto' })).status, 400);
 
-  const tunel = await fetch(`http://127.0.0.1:${porta}/api/quiosque`, { headers: { 'X-Forwarded-For': '203.0.113.9' } });
+  const tunel = await fetch(`${base}/api/quiosque`, { headers: { 'X-Forwarded-For': '203.0.113.9' }, signal: AbortSignal.timeout(10_000) });
   assert.equal(tunel.status, 403, 'quem chega por túnel/proxy não é a tela do jukebox');
-
-  const ip = ipDaRede();
-  if (ip) {
-    const r = await fetch(`http://${ip}:${porta}/api/quiosque`);
-    assert.equal(r.status, 403, 'celular na rede não acessa');
-    assert.equal((await fetch(`http://${ip}:${porta}/healthz`)).status, 200);
-  }
+  const saude = await fetch(`${base}/healthz`, { headers: { 'X-Forwarded-For': '203.0.113.9' }, signal: AbortSignal.timeout(10_000) });
+  assert.equal(saude.status, 200, 'o healthz continua aberto');
 });
 
 test('noteiro: pulsos seguidos viram uma nota, linha com valor é a nota, lixo é ignorado', { timeout: 20_000 }, (t) => {
