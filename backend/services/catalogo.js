@@ -85,6 +85,13 @@ export function cdsDoArtista(artistaId) {
     .all(artistaId).map(comContagem);
 }
 
+// Todos os CDs que o cliente pode escolher, na ordem da máquina (ritmo, artista, ano, título). O número do CD na
+// tela é a posição nesta lista. Lançamentos entram também (na máquina não há aba separada).
+export function todosOsCds() {
+  return db.prepare(`${CD_SELECT} WHERE c.oculto = 0 ORDER BY cat.nome, a.nome, c.ano, c.titulo`).all()
+    .filter((cd) => cd.total_musicas > 0).map(comContagem);
+}
+
 export function obterCd(id) {
   const cd = db.prepare(`${CD_SELECT} WHERE c.id = ? AND c.oculto = 0`).get(id);
   return cd ? comContagem(cd) : null;

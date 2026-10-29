@@ -1,12 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { CHAVE_SESSAO } from '../../context/Sessao.jsx';
+import { api } from '../../api.js';
 
 const dataBr = (dia) => dia.split('-').reverse().join('/');
 
-function lerSessaoDoNavegador() {
-  try { return localStorage.getItem(CHAVE_SESSAO); } catch { return null; }
-}
+// A cortesia cai no saldo do jukebox, o mesmo que aparece na tela dele.
+const sessaoDoJukebox = () => api('/quiosque').then((q) => q.sessao.id);
 
 export default function Cortesia({ chamar }) {
   const [estado, setEstado] = useState(null);
@@ -25,10 +23,9 @@ export default function Cortesia({ chamar }) {
       // Os créditos vão pra sessão deste navegador, a mesma que o app do cliente usa neste endereço.
       const r = await chamar('/admin/cortesia', {
         metodo: 'POST',
-        corpo: { quantidade: Number(quantidade), session_id: lerSessaoDoNavegador() },
+        corpo: { quantidade: Number(quantidade), session_id: await sessaoDoJukebox() },
       });
-      try { localStorage.setItem(CHAVE_SESSAO, r.session_id); } catch { /* sem storage */ }
-      setMensagem({ tipo: 'ok', texto: `✔ ${quantidade} créditos de cortesia adicionados. Abra o app neste navegador para usar.` });
+      setMensagem({ tipo: 'ok', texto: `✔ ${quantidade} créditos de cortesia adicionados no jukebox.` });
       carregar();
     } catch (erro) {
       setMensagem({ tipo: 'erro', texto: erro.message });
@@ -47,8 +44,8 @@ export default function Cortesia({ chamar }) {
     <form className="admin-form" onSubmit={conceder}>
       <h2>🎁 Créditos de cortesia do dono</h2>
       <p className="nota">
-        Adiciona créditos <b>sem passar pelo Pix</b>, <b>uma vez por dia</b> (renova à meia-noite), até {estado.maximo} créditos.
-        Eles caem na sessão <b>deste navegador</b>: use o mesmo endereço no app (ex.: no celular, abra o admin e o app pelo mesmo link).
+        Adiciona créditos <b>sem pagamento</b>, <b>uma vez por dia</b> (renova à meia-noite), até {estado.maximo} créditos.
+        Eles caem no saldo <b>da tela do jukebox</b>.
       </p>
       <p className="nota">
         Músicas tocadas com cortesia <b>não entram no faturamento nem na divisão com a boate</b>.
@@ -71,7 +68,6 @@ export default function Cortesia({ chamar }) {
       <button className="btn btn-grande" disabled={estado.usado_hoje || !valida || enviando}>
         {estado.usado_hoje ? 'JÁ USADO HOJE' : enviando ? 'ADICIONANDO…' : `ADICIONAR ${valida ? quantidade : ''} CRÉDITOS GRÁTIS`}
       </button>
-      <Link to="/" className="btn btn-fantasma">Abrir o app neste navegador</Link>
 
       {estado.historico.length > 0 && (
         <>

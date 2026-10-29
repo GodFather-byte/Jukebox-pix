@@ -13,6 +13,7 @@ import { iniciarVigia } from './crons/vigia.js';
 import { urlDoApp } from './rede.js';
 import { capasDir } from './services/biblioteca.js';
 import { cartazesDir } from './services/cartazes.js';
+import { encerrarNoteiro, iniciarNoteiro } from './services/noteiro.js';
 import { iniciarRecados } from './services/recados.js';
 import { iniciarSobDemanda } from './services/sobdemanda.js';
 import { agendarAnalise, encerrarTudo as encerrarVolume } from './services/volume.js';
@@ -26,6 +27,7 @@ import filaRoutes from './routes/fila.js';
 import infoRoutes from './routes/info.js';
 import musicasRoutes from './routes/musicas.js';
 import pagamentoRoutes from './routes/pagamento.js';
+import quiosqueRoutes from './routes/quiosque.js';
 import recadosRoutes from './routes/recados.js';
 import sessoesRoutes from './routes/sessoes.js';
 import sugestoesRoutes from './routes/sugestoes.js';
@@ -45,6 +47,16 @@ app.use((req, res, next) => {
   });
   next();
 });
+// O cliente escolhe e paga só no jukebox: de fora deste computador entra apenas o aviso do Mercado Pago
+// (que de todo jeito só diz "consulte o pagamento X"). ACESSO_REDE=1 libera a rede de novo.
+// Túnel ou proxy (cloudflared, Nginx) conectam pelo 127.0.0.1, mas trazem o cabeçalho de encaminhamento: não contam como local.
+const LOCAL = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
+const ENCAMINHADO = ['x-forwarded-for', 'forwarded', 'cf-connecting-ip', 'x-real-ip'];
+const ehLocal = (req) => LOCAL.has(req.socket.remoteAddress) && !ENCAMINHADO.some((h) => req.headers[h]);
+app.use((req, res, next) => {
+  if (config.acessoRede || ehLocal(req) || req.path === '/api/pagamento/webhook' || req.path === '/healthz') return next();
+  res.status(403).type('text/plain; charset=utf-8').send('Este jukebox atende só na tela dele.');
+});
 // Verificação de saúde para hospedagens (Render, Railway, Docker, uptime monitors).
 app.get('/healthz', (req, res) => {
   db.prepare('SELECT 1').get();
@@ -59,6 +71,7 @@ app.use('/api/musicas', musicasRoutes);
 app.use('/api/sessoes', sessoesRoutes);
 app.use('/api/fila', filaRoutes);
 app.use('/api/pagamento', pagamentoRoutes);
+app.use('/api/quiosque', quiosqueRoutes);
 app.use('/api/sugestoes', sugestoesRoutes);
 app.use('/api/recados', recadosRoutes);
 app.use('/api/vales', valesRoutes);
@@ -109,6 +122,7 @@ export const servidor = app.listen(config.porta, config.host, (erro) => {
     iniciarManutencao();
     iniciarBackups();
     iniciarRecados();
+    iniciarNoteiro();
     iniciarSobDemanda();
     iniciarVigia();
     agendarAnalise();
@@ -120,8 +134,8 @@ export const servidor = app.listen(config.porta, config.host, (erro) => {
   }
   notificar({ type: 'ready', port: servidor.address().port, clientUrl: urlDoApp(), player: backendPlayer });
   console.log(`\n🎵 ${config.nomeLocal} no ar`);
-  console.log(`   Clientes (celular):  ${urlDoApp()}`);
-  console.log(`   Monitor:             http://localhost:${config.porta}/tela`);
+  console.log(`   Jukebox:             http://localhost:${config.porta}/`);
+  console.log(`   Telão (2º monitor):  http://localhost:${config.porta}/telao`);
   console.log(`   Admin:               http://localhost:${config.porta}/admin`);
   console.log(`   Pagamento: ${config.pagamento.provedor}${config.pagamento.provedor === 'mock' ? ' (MODO DE TESTE, créditos grátis)' : ''} | Player: ${backendPlayer}\n`);
 });
@@ -155,6 +169,7 @@ export function encerrar(codigo = 0) {
   };
   const limite = setTimeout(finalizar, 3000);
   player.parar();
+  encerrarNoteiro();
   youtube.encerrarTudo();
   encerrarVolume();
   encerrarEventos();

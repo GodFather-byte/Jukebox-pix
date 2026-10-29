@@ -1,8 +1,12 @@
 import { Router } from 'express';
 import { ErroApi } from '../erros.js';
-import { lancamentos, musicasDoCd, obterCd } from '../services/catalogo.js';
+import { lancamentos, musicasDoCd, obterCd, todosOsCds } from '../services/catalogo.js';
 
 const router = Router();
+
+router.get('/', (req, res) => {
+  res.json({ cds: todosOsCds() });
+});
 
 router.get('/lancamentos', (req, res) => {
   res.json({ lancamentos: lancamentos() });

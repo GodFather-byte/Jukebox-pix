@@ -25,6 +25,8 @@ export const config = {
   // Atrás de proxy reverso (Render, Railway, Nginx, Cloudflare): usa o IP/https reais do cliente.
   confiarProxy: env.TRUST_PROXY === '1' || env.TRUST_PROXY === 'true',
   urlPublica: env.PUBLIC_URL || null,
+  // O cliente escolhe e paga só no jukebox. ACESSO_REDE=1 libera de novo o acesso pela rede (painel no celular do dono etc.).
+  acessoRede: env.ACESSO_REDE === '1' || env.ACESSO_REDE === 'true',
   nomeLocal: env.NOME_LOCAL || 'Jukebox',
 
   raiz,
@@ -55,10 +57,14 @@ export const config = {
   pagamento: {
     provedor: env.PAYMENT_PROVIDER || 'mock',
     pixExpiraMin: num('PIX_EXPIRA_MIN', 15),
+    // Tempo para o cliente passar o cartão na maquininha antes de a cobrança ser cancelada nela.
+    cartaoExpiraMin: num('CARTAO_EXPIRA_MIN', 3),
     mercadopago: {
       token: env.MERCADOPAGO_ACCESS_TOKEN || '',
       webhookSecret: env.MERCADOPAGO_WEBHOOK_SECRET || '',
       urlWebhook: env.WEBHOOK_PUBLIC_URL || '',
+      // Maquininha Point (débito e crédito): o ID aparece na tela de configuração ("Procurar maquininhas").
+      terminal: env.MERCADOPAGO_POINT_TERMINAL || '',
     },
   },
 
@@ -72,6 +78,15 @@ export const config = {
     mpv: env.MPV_PATH || 'mpv',
     vlc: env.VLC_PATH || '',
     simSegundos: num('PLAYER_SIM_SEGUNDOS', 15),
+  },
+
+  // Noteiro (aceitador de notas). "serial": uma placa (Arduino ou interface do noteiro) manda pela porta serial
+  // uma linha por nota com o valor em reais ("10") ou uma linha "P" por pulso. Veja docs/NOTEIRO.md.
+  noteiro: {
+    tipo: env.NOTEIRO || 'desligado', // desligado | serial
+    porta: env.NOTEIRO_PORTA || '', // ex.: COM3 (Windows) ou /dev/ttyUSB0 (Linux)
+    baud: num('NOTEIRO_BAUD', 9600),
+    reaisPorPulso: num('NOTEIRO_REAIS_POR_PULSO', 1),
   },
 
   // Medição de volume das músicas (volume parelho). Sem o ffmpeg só valem as tags ReplayGain dos arquivos.

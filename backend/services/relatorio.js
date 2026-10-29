@@ -40,6 +40,11 @@ export function resumoPeriodo(desdeIso, ateIso) {
       FROM pagamentos WHERE status = 'confirmado' AND confirmado_em >= ? AND confirmado_em < ?
   `).get(desdeIso, ateIso);
   const valesUsados = vales.totaisDoPeriodo(desdeIso, ateIso);
+  const porMetodo = { pix: 0, cartao: 0, nota: 0 };
+  for (const { metodo, total } of db.prepare(`
+    SELECT metodo, COALESCE(SUM(valor), 0) AS total
+      FROM pagamentos WHERE status = 'confirmado' AND confirmado_em >= ? AND confirmado_em < ? GROUP BY metodo
+  `).all(desdeIso, ateIso)) porMetodo[metodo] = total;
 
   const bruto = musicas.bruto + recadosNoAr.bruto;
   const usuario = (bruto * config.divisaoUsuario) / 100;
@@ -52,6 +57,7 @@ export function resumoPeriodo(desdeIso, ateIso) {
     boate: bruto - usuario,
     pagamentos: pix.pagamentos,
     arrecadado: pix.arrecadado,
+    por_metodo: porMetodo,
     ticket_medio: pix.pagamentos ? pix.arrecadado / pix.pagamentos : 0,
     vales: valesUsados.resgatados,
     vales_creditos: valesUsados.creditos,

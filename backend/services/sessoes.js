@@ -1,4 +1,3 @@
-import crypto from 'node:crypto';
 import { db, agora, novoId, ehSessaoInterna, SESSAO_CASA, SESSAO_SISTEMA } from '../database.js';
 import { config } from '../config.js';
 
@@ -81,10 +80,9 @@ export function limparSessoesVazias() {
   `).run(limite);
 }
 
-// Nome anônimo estável pra mostrar na fila sem expor o id da sessão (que vale como senha).
+// Quem pediu, como aparece na fila. Todo cliente pede na tela do jukebox; o id da sessão (que vale como senha) nunca sai.
 export function rotulo(sessionId) {
   if (sessionId === SESSAO_SISTEMA) return 'Playlist automática';
   if (sessionId === SESSAO_CASA) return 'Pedido da casa';
-  const hash = crypto.createHash('sha1').update(String(sessionId)).digest('hex');
-  return `Convidado ${hash.slice(0, 4).toUpperCase()}`;
+  return 'Pedido no jukebox';
 }

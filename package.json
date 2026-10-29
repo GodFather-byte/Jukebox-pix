@@ -14,23 +14,26 @@
     "seed": "node backend/seed.js",
     "build": "npm --prefix frontend run build",
     "setup": "npm install && npm --prefix frontend install && npm run build && npm run seed",
-    "test": "node --test tests/*.test.js",
+    "test": "node --test --test-timeout=180000 --test-force-exit tests/*.test.js",
     "desktop:rebuild": "node node_modules/electron/install.js && electron-builder install-app-deps",
     "desktop": "npm run desktop:rebuild && electron .",
     "desktop:pack": "npm run build && electron-builder --dir --publish never",
-    "desktop:dist": "npm run build && electron-builder --publish never"
+    "desktop:dist": "npm run build && electron-builder --publish never",
+    "ferramentas": "node scripts/baixar-ferramentas.mjs"
   },
   "engines": {
     "node": ">=20"
   },
   "dependencies": {
+    "@serialport/parser-readline": "^13.0.0",
     "better-sqlite3": "^13.0.3",
     "dotenv": "^18.0.5",
     "express": "^5.2.1",
     "multer": "^2.4.0",
     "music-metadata": "^11.16.1",
     "node-cron": "^4.6.0",
-    "qrcode": "^1.5.4"
+    "qrcode": "^1.5.4",
+    "serialport": "^13.0.0"
   },
   "devDependencies": {
     "electron": "45.0.0",
@@ -54,7 +57,17 @@
     ],
     "asar": true,
     "asarUnpack": [
-      "node_modules/better-sqlite3/**"
+      "node_modules/better-sqlite3/**",
+      "node_modules/@serialport/bindings-cpp/**"
+    ],
+    "extraResources": [
+      {
+        "from": "ferramentas/${os}",
+        "to": "ferramentas",
+        "filter": [
+          "**/*"
+        ]
+      }
     ],
     "npmRebuild": true,
     "publish": null,
@@ -98,6 +111,20 @@
       "maintainer": "GodFather-byte <GodFather-byte@users.noreply.github.com>",
       "synopsis": "Jukebox local com pagamento Pix",
       "description": "Jukebox Pix: painel, telão e atendimento aos celulares na rede local."
+    },
+    "deb": {
+      "depends": [
+        "libgtk-3-0",
+        "libnotify4",
+        "libnss3",
+        "libxss1",
+        "libxtst6",
+        "xdg-utils",
+        "libatspi2.0-0",
+        "libuuid1",
+        "libsecret-1-0",
+        "mpv | vlc"
+      ]
     }
   }
 }

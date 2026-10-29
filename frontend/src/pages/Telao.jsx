@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import Balcao from '../components/Balcao.jsx';
 import Capa from '../components/Capa.jsx';
 import Progresso from '../components/Progresso.jsx';
 import { api, capaUrl, textoEspera } from '../api.js';
@@ -11,10 +10,9 @@ function relogio(agora) {
   return new Date(agora).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 }
 
-// Tela do monitor da boate: o cliente paga nesta tela ou, se preferir, abre o app no celular pelo QR.
-// Também mostra o que está tocando, a fila, os recados pagos e os cartazes dos patrocinadores.
-// O balcão (pagar/buscar) fica por cima e não desliga o monitor: a conexão ?tela=1 continua aberta.
-export default function Tela() {
+// Telão para um segundo monitor (salão): o que está tocando, a fila, os recados pagos e os cartazes.
+// Só mostra: escolher e pagar é na tela do jukebox.
+export default function Telao() {
   useManterAceso();
   const info = useApi('/info');
   const agora = useAgora(1000);
@@ -26,7 +24,6 @@ export default function Tela() {
   const [cartazAtual, setCartazAtual] = useState(null);
   const [conectado, setConectado] = useState(true);
   const [telaCheia, setTelaCheia] = useState(false);
-  const [balcao, setBalcao] = useState(false);
 
   useEffect(() => {
     const carregarFila = () => api('/fila').then(setFila).catch(() => {});
@@ -78,10 +75,6 @@ export default function Tela() {
 
   useEffect(() => {
     const aoTecla = (e) => {
-      if (e.key === 'Escape' && balcao && !(e.target instanceof HTMLInputElement) && !(e.target instanceof HTMLTextAreaElement)) {
-        setBalcao(false);
-        return;
-      }
       if ((e.key === 'f' || e.key === 'F') && !e.repeat && !(e.target instanceof HTMLInputElement) && !(e.target instanceof HTMLTextAreaElement)) {
         e.preventDefault();
         alternarTelaCheia();
@@ -89,7 +82,7 @@ export default function Tela() {
     };
     window.addEventListener('keydown', aoTecla);
     return () => window.removeEventListener('keydown', aoTecla);
-  }, [balcao]);
+  }, []);
 
   // O recado some sozinho na hora marcada pelo servidor (mesmo se o aviso de "acabou" se perder).
   useEffect(() => {
@@ -140,12 +133,8 @@ export default function Tela() {
 
       <aside className="tela-qr">
         <h1>🎵 {info.dados?.nome ?? 'Jukebox'}</h1>
-        <button type="button" className="btn btn-grande tela-pagar" onClick={() => setBalcao(true)}>PAGAR NESTA TELA</button>
-        <p className="tela-ou">ou use o celular</p>
-        {info.dados && <img src={info.dados.qr_app} alt={`QR code para abrir ${info.dados.url_app}`} />}
-        <p className="tela-passos"><b>1.</b> Aponte a câmera<br /><b>2.</b> Pague com Pix<br /><b>3.</b> Escolha a música</p>
-        {info.dados && <code>{info.dados.url_app.replace('http://', '')}</code>}
-        <small>Conecte-se ao WiFi da casa</small>
+        <p className="tela-passos">Escolha sua música<br />na <b>tela do jukebox</b></p>
+        <p className="tela-ou">Pix · Débito · Crédito · Dinheiro</p>
       </aside>
 
       <section className="tela-principal">
@@ -175,7 +164,7 @@ export default function Tela() {
               </div>
             </div>
           ) : (
-            <p className="tela-vazio">Toque em PAGAR NESTA TELA ou escaneie o QR e escolha a próxima música 🎶</p>
+            <p className="tela-vazio">Escolha a próxima música na tela do jukebox 🎶</p>
           )}
           <Progresso item={atual} mostrarTempo />
           {seguinte && (
@@ -220,9 +209,7 @@ export default function Tela() {
         </div>
       </section>
 
-      {balcao && <Balcao tocando={atual} onFechar={() => setBalcao(false)} />}
-
-      {cartazAtual && !balcao && (
+      {cartazAtual && (
         <div className="tela-cartaz" key={cartazAtual.id}>
           <img src={cartazAtual.imagem} alt={cartazAtual.legenda ?? 'Cartaz'} />
           {cartazAtual.legenda && <p>{cartazAtual.legenda}</p>}

@@ -45,7 +45,7 @@ export default function Internet({ chamar }) {
       const r = await carregar();
       setMensagem(config.ativo && !r.ytdlp.ok
         ? { tipo: 'erro', texto: 'Ajustes salvos, mas o yt-dlp não foi encontrado neste computador: os clientes ainda não veem a busca. Siga os passos acima.' }
-        : { tipo: 'ok', texto: '✔ Ajustes salvos. Os celulares já foram atualizados.' });
+        : { tipo: 'ok', texto: '✔ Ajustes salvos. A tela do jukebox já foi atualizada.' });
     } catch (erro) {
       setMensagem({ tipo: 'erro', texto: erro.message });
     } finally {

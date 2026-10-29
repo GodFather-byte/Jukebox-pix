@@ -1,14 +1,11 @@
 import { Router } from 'express';
-import QRCode from 'qrcode';
 import { config } from '../config.js';
 import { conectar } from '../events.js';
 import { lerRegras } from '../services/configuracoes.js';
-import { urlDoApp } from '../rede.js';
 
 const router = Router();
 
-router.get('/info', async (req, res) => {
-  const url = urlDoApp();
+router.get('/info', (req, res) => {
   res.json({
     nome: config.nomeLocal,
     modo_teste: config.pagamento.provedor === 'mock',
@@ -16,8 +13,6 @@ router.get('/info', async (req, res) => {
     valor_min: config.valorMin,
     valor_max: config.valorMax,
     sessao_ttl_min: config.sessaoTtlMin,
-    url_app: url,
-    qr_app: await QRCode.toDataURL(url, { margin: 2, width: 480 }),
   });
 });
 

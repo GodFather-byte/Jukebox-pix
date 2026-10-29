@@ -253,6 +253,8 @@ garantirColuna('fila', 'prioridade', 'INTEGER NOT NULL DEFAULT 0');
 garantirColuna('cds', 'oculto', 'INTEGER NOT NULL DEFAULT 0');
 garantirColuna('musicas', 'oculta', 'INTEGER NOT NULL DEFAULT 0');
 garantirColuna('pagamentos', 'bonus', 'INTEGER NOT NULL DEFAULT 0');
+// Como o cliente pagou no jukebox: pix (QR na tela), cartao (maquininha) ou nota (noteiro).
+garantirColuna('pagamentos', 'metodo', "TEXT NOT NULL DEFAULT 'pix'");
 garantirColuna('historico_reproducao', 'cortesia', 'INTEGER NOT NULL DEFAULT 0');
 // Volume parelho: loudness medido da faixa (LUFS) e pico (dBFS). NULL = ainda não analisada.
 garantirColuna('musicas', 'lufs', 'REAL');

@@ -71,10 +71,22 @@ jobs:
         run: npm test
       - name: Compilar frontend
         run: npm run build
+      - name: Baixar ferramentas do instalador (mpv, ffmpeg, yt-dlp)
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/baixar-ferramentas.mjs ${{ matrix.target }}
       - name: Recompilar módulos nativos para Electron
         run: npm run desktop:rebuild
       - name: Empacotar para a plataforma nativa
         run: npx --no-install electron-builder --${{ matrix.target }} --x64 --publish never
+      - name: Conferir ferramentas dentro do pacote
+        run: |
+          pasta=release/${{ matrix.target }}-unpacked/resources/ferramentas
+          if [ "${{ matrix.platform }}" = windows ]; then
+            for f in mpv/mpv.exe ffmpeg.exe yt-dlp.exe; do test -f "$pasta/$f" || { echo "Falta $f no pacote" >&2; exit 1; }; done
+          else
+            for f in ffmpeg yt-dlp; do test -x "$pasta/$f" || { echo "Falta $f no pacote" >&2; exit 1; }; done
+          fi
       - name: Smoke do executável Windows
         if: matrix.platform == 'windows'
         run: node desktop/smoke.mjs "release/win-unpacked/Jukebox Pix.exe"
