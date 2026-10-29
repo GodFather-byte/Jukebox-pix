@@ -83,7 +83,41 @@ export default function PlayerAdmin({ chamar, versao }) {
           <span className="interruptor-trilho" aria-hidden="true" />
           <span>
             <strong>🎲 Playlist automática</strong>
-            <small>Quando a fila esvazia, toca uma música aleatória do acervo para o salão não ficar em silêncio. Não conta no ranking nem no faturamento.</small>
+            <small>Quando ninguém pede música, toca uma aleatória do acervo para chamar o cliente. Não conta no ranking nem no faturamento.</small>
+          </span>
+        </label>
+        <label className="campo-rotulo">
+          Tocar uma aleatória depois de quanto tempo de silêncio
+          <select className="campo" value={estado.automatico.intervalo_min} disabled={!estado.automatico.ativo}
+            onChange={(e) => acao('/admin/automatico', { metodo: 'PUT', corpo: { intervalo_min: Number(e.target.value) } })}>
+            {[0, 1, 2, 5, 10, 15, 30].map((m) => (
+              <option key={m} value={m}>{m === 0 ? 'Na hora (uma atrás da outra)' : `${m} ${m === 1 ? 'minuto' : 'minutos'}`}</option>
+            ))}
+          </select>
+        </label>
+        <label className="interruptor" aria-disabled={!estado.automatico.ativo}>
+          <input type="checkbox" checked={estado.automatico.so_top} disabled={!estado.automatico.ativo}
+            onChange={(e) => acao('/admin/automatico', { metodo: 'PUT', corpo: { so_top: e.target.checked } })} />
+          <span className="interruptor-trilho" aria-hidden="true" />
+          <span>
+            <strong>Sortear só entre as mais tocadas da casa</strong>
+            <small>As 40 músicas que os clientes mais pedem chamam mais atenção. Casa nova, sem histórico: sorteia do acervo.</small>
+          </span>
+        </label>
+        <label className="campo-rotulo">
+          Volume da aleatória ({estado.automatico.volume}% do volume normal)
+          <input type="range" min="30" max="100" step="5" defaultValue={estado.automatico.volume} disabled={!estado.automatico.ativo}
+            onPointerUp={(e) => acao('/admin/automatico', { metodo: 'PUT', corpo: { volume: Number(e.currentTarget.value) } })}
+            onKeyUp={(e) => acao('/admin/automatico', { metodo: 'PUT', corpo: { volume: Number(e.currentTarget.value) } })} />
+          <small>Mais baixa que a música paga: quem quer a dele no volume cheio, coloca créditos.</small>
+        </label>
+        <label className="interruptor" aria-disabled={!estado.automatico.ativo}>
+          <input type="checkbox" checked={estado.automatico.vinheta} disabled={!estado.automatico.ativo}
+            onChange={(e) => acao('/admin/automatico', { metodo: 'PUT', corpo: { vinheta: e.target.checked } })} />
+          <span className="interruptor-trilho" aria-hidden="true" />
+          <span>
+            <strong>Vinheta de chamada antes de cada aleatória</strong>
+            <small>Toca uma das suas vinhetas (aba Divulgação), por exemplo “coloque seus créditos e escolha a sua música”. Sem vinheta cadastrada, nada muda.</small>
           </span>
         </label>
         <label className="interruptor" aria-disabled={!estado.automatico.ativo}>

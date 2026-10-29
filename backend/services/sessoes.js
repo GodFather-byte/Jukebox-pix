@@ -1,7 +1,11 @@
 import { db, agora, novoId, ehSessaoInterna, SESSAO_CASA, SESSAO_SISTEMA } from '../database.js';
 import { config } from '../config.js';
 
-const novaExpiracao = () => new Date(Date.now() + config.sessaoTtlMin * 60_000).toISOString();
+// SESSAO_TTL_MIN=0: créditos nunca vencem. As contas abaixo comparam com `limite()`, que nesse caso é '' (nada é menor).
+const NUNCA = '2999-12-31T00:00:00.000Z';
+const vence = () => config.sessaoTtlMin > 0;
+const limite = () => (vence() ? agora() : '');
+const novaExpiracao = () => (vence() ? new Date(Date.now() + config.sessaoTtlMin * 60_000).toISOString() : NUNCA);
 
 export function criarSessao() {
   const id = novoId();
@@ -17,7 +21,7 @@ export function obterSessao(id) {
   const sessao = db.prepare('SELECT * FROM sessoes WHERE id = ?').get(id);
   if (!sessao) return null;
 
-  if ((sessao.saldo > 0 || sessao.saldo_cortesia > 0) && sessao.expira_em < agora()) {
+  if ((sessao.saldo > 0 || sessao.saldo_cortesia > 0) && sessao.expira_em < limite()) {
     db.prepare('UPDATE sessoes SET saldo = 0, saldo_cortesia = 0 WHERE id = ?').run(id);
     sessao.saldo = 0;
     sessao.saldo_cortesia = 0;
@@ -30,13 +34,13 @@ export function obterSessao(id) {
     saldo: total,
     saldo_cortesia: sessao.saldo_cortesia,
     expira_em: sessao.expira_em,
-    minutos_restantes: total > 0 ? Math.max(0, Math.ceil(restanteMs / 60_000)) : 0,
+    minutos_restantes: total > 0 && vence() ? Math.max(0, Math.ceil(restanteMs / 60_000)) : null,
   };
 }
 
 // Pagamento, reembolso e cortesia renovam o prazo; saldo vencido que ainda não foi zerado não é somado.
 export function creditar(id, pago, cortesia = 0) {
-  const agoraIso = agora();
+  const agoraIso = limite();
   db.prepare(`
     UPDATE sessoes
        SET saldo = CASE WHEN expira_em < @agora THEN 0 ELSE saldo END + @pago,
@@ -50,7 +54,7 @@ export function creditar(id, pago, cortesia = 0) {
 // ({ cortesia, pago }) ou null se não há saldo suficiente ou a sessão venceu.
 export function debitar(id, creditos) {
   const sessao = db.prepare('SELECT saldo, saldo_cortesia, expira_em FROM sessoes WHERE id = ?').get(id);
-  if (!sessao || sessao.expira_em < agora()) return null;
+  if (!sessao || sessao.expira_em < limite()) return null;
 
   const cortesia = Math.min(sessao.saldo_cortesia, creditos);
   const pago = creditos - cortesia;
@@ -62,6 +66,7 @@ export function debitar(id, creditos) {
 }
 
 export function expirarSessoes() {
+  if (!vence()) return [];
   const vencidas = db.prepare('SELECT id FROM sessoes WHERE (saldo > 0 OR saldo_cortesia > 0) AND expira_em < ?').all(agora());
   if (vencidas.length) {
     db.prepare('UPDATE sessoes SET saldo = 0, saldo_cortesia = 0 WHERE (saldo > 0 OR saldo_cortesia > 0) AND expira_em < ?').run(agora());

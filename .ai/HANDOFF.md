@@ -1,30 +1,37 @@
 # Handoff
-Atualizado por: ChatGPT/Codex em 2026-10-29 (branch `codex/testes-pagamento-idempotencia`)
+Atualizado por: Claude Code em 2026-10-29 (branch `claude/vibrant-faraday-etr6xs`, recriada da `main`)
 
 ## Objetivo atual
-Jukebox de bar no computador da máquina: música por créditos, Pix, Point, noteiro, busca YouTube e tela por toque/botões físicos.
+Jukebox de bar no computador da máquina: música por créditos, Pix, Point, noteiro, busca YouTube e tela por
+toque/botões físicos. Próxima meta do dono: **piloto na boate**.
 
 ## Situação da equipe
-- O PR #9 do Claude Code já foi integrado na `main`. O instalador e a tela "palco neon" seguem aguardando teste prático e aprovação do dono antes da distribuição.
-- O PR #10 do ChatGPT/Codex permanece em rascunho, isolado da `main`: testes de pagamento Pix sem crédito duplicado.
-- Nenhum arquivo de implementação do Claude foi modificado nesta branch.
+- PR #9 (Claude Code: instalador, tela "palco neon", Point, noteiro, YouTube) e PR #10 (Codex: testes de
+  pagamento Pix sem crédito duplicado) já estão na `main`.
+- `tests/pagamento-idempotencia.test.js` do Codex foi executado pelo Claude Code: passa (suíte inteira: 30 testes).
 
-## Feito nesta sessão
-- Lidos `AGENTS.md`, `.ai/MAPA.md` e este handoff.
-- Criado `tests/pagamento-idempotencia.test.js`: confirmações repetidas não geram crédito extra; cancelar após confirmação preserva o saldo; confirmação tardia de cobrança já marcada como falha credita apenas uma vez.
-- Código enviado ao GitHub, mas execução do teste **não verificada**: ambiente local sem acesso à rede do GitHub e sem dependências do projeto.
+## Feito nesta sessão (para o piloto)
+- Créditos não vencem: `SESSAO_TTL_MIN=0` é o padrão (`backend/config.js`, `backend/services/sessoes.js`).
+  Com valor > 0 volta a vencer como antes.
+- Playlist automática espera 5 min de silêncio antes de cada aleatória: chave `automatico_intervalo_min`
+  (`backend/services/configuracoes.js`, `backend/player.js`), seletor na aba Player do painel. 0 = sem pausa.
+- Aleatória que chama o cliente (chaves `automatico_so_top`, `automatico_volume`, `automatico_vinheta`): sorteia entre
+  as 40 mais tocadas (`fila.criarAutomatico`), toca a 80% do volume (`player.js` `volumeDe`), vinheta de chamada
+  antes (`chamadaFeita` em `player.js`) e a tela mostra "Tocando de graça" (`Maquina.jsx`, `atual.automatica`).
+- "Abrir o jukebox ao ligar o computador": caixa na tela de configuração (`INICIAR_COM_SISTEMA` no `.env`),
+  aplicada em `desktop/inicio-automatico.cjs` (Windows: login item; Linux: `~/.config/autostart`).
 
 ## Próximos passos
-1. Na branch do PR #10 executar `npm ci && npm --prefix frontend ci` e `node --test tests/pagamento-idempotencia.test.js`; depois `npm test`.
-2. Atualizar o PR #10 com a `main` atual (o PR #9 já foi integrado), resolver conflitos se houver e pedir revisão do diff ao Claude Code.
-3. Dono testar instalador do CI e equipamentos reais: Point, noteiro e encoder de botões.
-4. Não fazer merge nem distribuir versão sem validação dos testes e aprovação do dono.
+1. Dono testar o instalador do CI (Actions → Desktop → Artifacts) no computador da boate, primeiro em
+   "Só experimentar", depois "Atender clientes" só com Pix e valores baixos.
+2. Depois: maquininha Point; por último noteiro e placa dos botões (teclas em `frontend/src/maquina/teclas.js`).
+3. Opcional: tela de descanso e cartazes na tela da máquina.
 
 ## Arquivos e decisões importantes
-- Pix e cartões: `backend/services/pagamentos.js`, `backend/services/gateways/`.
-- Máquina: `frontend/src/maquina/`. Desktop: `desktop/`.
-- 1 crédito = R$ 1; nunca creditar pagamento real sem confirmação do provedor.
-- Servidor restrito à própria máquina; nunca expor rotas na rede.
-- O proprietário não quer estilo Spotify nem reprodução exata da máquina de referência.
-- Tela do cliente única; sem tela de celular.
-- `npm run desktop:rebuild` altera o SQLite para Electron: executar `npm ci` antes dos testes Node.
+- Pix e cartões: `backend/services/pagamentos.js`, `backend/services/gateways/`. Nunca creditar sem confirmação.
+- Máquina: `frontend/src/maquina/`. Desktop: `desktop/`. Servidor só na própria máquina.
+- O dono não quer estilo Spotify nem cópia da máquina da foto de referência.
+- `npm run desktop:rebuild` troca o SQLite para o Electron: rode `npm ci` antes dos testes Node.
+
+## Como rodar e testar
+`npm test`. Tela em modo teste: `npm run build`, `npm run seed`, `PAYMENT_PROVIDER=mock PLAYER=sim npm start`.

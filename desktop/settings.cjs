@@ -68,7 +68,7 @@ function senhaAleatoria(tamanho = 14) {
 function lerConfiguracao(directory) {
   const file = path.join(directory, '.env');
   if (!fs.existsSync(file)) {
-    return { existe: false, modo: 'producao', nomeLocal: '', senha: senhaAleatoria(), porta: 3000, temToken: false, terminal: '', noteiroPorta: '' };
+    return { existe: false, modo: 'producao', nomeLocal: '', senha: senhaAleatoria(), porta: 3000, temToken: false, terminal: '', noteiroPorta: '', iniciarComSistema: true };
   }
   const values = dotenv.parse(fs.readFileSync(file));
   return {
@@ -80,6 +80,7 @@ function lerConfiguracao(directory) {
     temToken: Boolean(values.MERCADOPAGO_ACCESS_TOKEN?.trim()),
     terminal: values.MERCADOPAGO_POINT_TERMINAL || '',
     noteiroPorta: values.NOTEIRO === 'serial' ? values.NOTEIRO_PORTA || '' : '',
+    iniciarComSistema: values.INICIAR_COM_SISTEMA === '1',
   };
 }
 
@@ -114,6 +115,7 @@ function salvarConfiguracao(directory, campos) {
     MERCADOPAGO_POINT_TERMINAL: terminal,
     NOTEIRO: noteiroPorta ? 'serial' : 'desligado',
     NOTEIRO_PORTA: noteiroPorta,
+    INICIAR_COM_SISTEMA: campos.iniciarComSistema ? '1' : '0',
   };
   if (token) valores.MERCADOPAGO_ACCESS_TOKEN = token;
   // Rede, provedor e player só mudam junto com o modo: ajuste manual do dono (PLAYER=vlc, HOST=IP) fica.
@@ -163,7 +165,7 @@ function readSettings(directory, inherited = process.env, ferramentas = {}) {
   });
   for (const [chave, valor] of Object.entries(ferramentas)) if (!env[chave]) env[chave] = valor; // "MPV_PATH=" vazio
   if (test) Object.assign(env, { HOST: '127.0.0.1', PAYMENT_PROVIDER: 'mock', PLAYER: values.PLAYER || 'sim', PUBLIC_URL: '' });
-  return { env, port, test };
+  return { env, port, test, iniciarComSistema: values.INICIAR_COM_SISTEMA === '1' };
 }
 
 const externalHosts = new Set(['github.com', 'www.mercadopago.com.br', 'mpv.io', 'www.videolan.org']);

@@ -5,6 +5,7 @@ const { spawnSync } = require('node:child_process');
 const { createSettings, readSettings, externalURL, localURL } = require('./settings.cjs');
 const { ferramentasEmbutidas, situacaoFerramentas } = require('./ferramentas.cjs');
 const { abrirConfiguracao } = require('./configuracao.cjs');
+const { aplicarInicioAutomatico } = require('./inicio-automatico.cjs');
 
 app.setName('Jukebox Pix');
 const smoke = process.argv.includes('--desktop-smoke-test');
@@ -161,6 +162,13 @@ async function run() {
       buttons: ['Continuar teste local', 'Fechar'], defaultId: 1, cancelId: 1,
     });
     if (response !== 0) return app.quit();
+  }
+  if (!smoke) {
+    try {
+      aplicarInicioAutomatico(app, settings.iniciarComSistema);
+    } catch {
+      log('FALHA_INICIO_AUTOMATICO'); // sem permissão na pasta de autostart: o jukebox abre normalmente
+    }
   }
   log('INICIANDO');
   backend = utilityProcess.fork(path.join(__dirname, 'backend.cjs'), [], {

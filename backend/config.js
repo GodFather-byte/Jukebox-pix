@@ -48,7 +48,8 @@ export const config = {
   valorMin: num('VALOR_MIN', 1),
   valorMax: num('VALOR_MAX', 500),
 
-  sessaoTtlMin: num('SESSAO_TTL_MIN', 60),
+  // Minutos sem uso até os créditos vencerem. 0 (padrão) = nunca vencem: o saldo fica na máquina, como numa jukebox de bar.
+  sessaoTtlMin: num('SESSAO_TTL_MIN', 0),
   lancamentoDias: num('LANCAMENTO_DIAS', 7),
   filaMax: num('FILA_MAX', 60),
   divisaoUsuario: num('DIVISAO_USUARIO', 50), // % do usuário; o resto vai pra boate

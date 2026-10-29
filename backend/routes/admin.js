@@ -371,8 +371,8 @@ router.put('/volume', async (req, res) => {
 // ---------- Playlist automática ----------
 
 router.put('/automatico', (req, res) => {
-  const { ativo, interrompe, categorias, agenda } = req.body ?? {};
-  const ajustes = configuracoes.salvarAutomatico({ ativo, interrompe, categorias, agenda });
+  const { ativo, interrompe, intervalo_min: intervaloMin, so_top: soTop, volume, vinheta, categorias, agenda } = req.body ?? {};
+  const ajustes = configuracoes.salvarAutomatico({ ativo, interrompe, intervalo_min: intervaloMin, so_top: soTop, volume, vinheta, categorias, agenda });
   if (ajustes.ativo) player.acordar();
   res.json(ajustes);
 });

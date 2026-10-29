@@ -119,3 +119,88 @@ test('noteiro: pulsos seguidos viram uma nota, linha com valor é a nota, lixo �
   assert.equal(saida.final, 25);
   assert.deepEqual(saida.metodos, [{ metodo: 'nota', valor: 5 }, { metodo: 'nota', valor: 20 }]);
 });
+
+// Roda um trecho com o banco de uma pasta de dados e devolve a última linha impressa (JSON).
+function rodar(t, codigo, extras = {}, dados = pastaDeDados(t)) {
+  const r = spawnSync(process.execPath, ['--input-type=module', '-e', codigo], {
+    cwd: raiz, env: ambiente({ JUKEBOX_DATA_DIR: dados, ...extras }), encoding: 'utf8', timeout: 15_000,
+  });
+  assert.equal(r.status, 0, r.stderr);
+  return JSON.parse(r.stdout.trim().split('\n').at(-1));
+}
+
+test('créditos da máquina não vencem por padrão; com SESSAO_TTL_MIN eles vencem', { timeout: 30_000 }, (t) => {
+  const codigo = `
+    const { sessaoDoQuiosque } = await import('./backend/services/quiosque.js');
+    const { creditar, debitar, expirarSessoes, obterSessao } = await import('./backend/services/sessoes.js');
+    const { db } = await import('./backend/database.js');
+    const id = sessaoDoQuiosque().id;
+    creditar(id, 10);
+    // Finge que a última vez que alguém mexeu foi há dois dias.
+    db.prepare("UPDATE sessoes SET expira_em = '2000-01-01T00:00:00.000Z' WHERE id = ?").run(id);
+    const vencidas = expirarSessoes();
+    const saldo = obterSessao(id).saldo;
+    const debito = debitar(id, 3);
+    console.log(JSON.stringify({ vencidas: vencidas.length, saldo, debitou: Boolean(debito), final: obterSessao(id).saldo }));
+    db.close();
+  `;
+  assert.deepEqual(rodar(t, codigo), { vencidas: 0, saldo: 10, debitou: true, final: 7 });
+  assert.deepEqual(rodar(t, codigo, { SESSAO_TTL_MIN: '60' }), { vencidas: 1, saldo: 0, debitou: false, final: 0 });
+});
+
+test('playlist automática espera o intervalo de silêncio antes de sortear', { timeout: 60_000 }, (t) => {
+  const dados = pastaDeDados(t);
+  const seed = spawnSync(process.execPath, ['backend/seed.js'], { cwd: raiz, env: ambiente({ JUKEBOX_DATA_DIR: dados }), encoding: 'utf8', timeout: 30_000 });
+  assert.equal(seed.status, 0, seed.stderr);
+  const codigo = (intervalo) => `
+    const configuracoes = await import('./backend/services/configuracoes.js');
+    const player = await import('./backend/player.js');
+    const { db } = await import('./backend/database.js');
+    configuracoes.salvarAutomatico({ ativo: true, intervalo_min: ${intervalo} });
+    player.iniciar();
+    await new Promise((r) => setTimeout(r, 2500));
+    const tocando = player.estado().tocando;
+    player.parar();
+    console.log(JSON.stringify({ tocando, intervalo: configuracoes.lerAutomatico().intervalo_min }));
+    db.close();
+  `;
+  // Padrão novo: 5 minutos de silêncio antes da aleatória.
+  assert.deepEqual(rodar(t, codigo(5), {}, dados), { tocando: false, intervalo: 5 });
+  // Zero: toca na hora, como antes.
+  assert.deepEqual(rodar(t, codigo(0), {}, dados), { tocando: true, intervalo: 0 });
+});
+
+test('aleatória: sorteia entre as mais tocadas, sem repetir a recente; padrões de volume e vinheta', { timeout: 60_000 }, (t) => {
+  const dados = pastaDeDados(t);
+  const seed = spawnSync(process.execPath, ['backend/seed.js'], { cwd: raiz, env: ambiente({ JUKEBOX_DATA_DIR: dados }), encoding: 'utf8', timeout: 30_000 });
+  assert.equal(seed.status, 0, seed.stderr);
+  const saida = rodar(t, `
+    const fila = await import('./backend/services/fila.js');
+    const configuracoes = await import('./backend/services/configuracoes.js');
+    const { db } = await import('./backend/database.js');
+    db.prepare('UPDATE musicas SET vezes_tocada = 0').run();
+    const [a, b] = db.prepare('SELECT id FROM musicas ORDER BY rowid LIMIT 2').all().map((m) => m.id);
+    db.prepare('UPDATE musicas SET vezes_tocada = 50 WHERE id IN (?, ?)').run(a, b);
+    const sorteadas = new Set();
+    for (let i = 0; i < 20; i++) {
+      const item = fila.criarAutomatico([], [], { soTop: true });
+      sorteadas.add(item.musica_id);
+      db.prepare('DELETE FROM fila WHERE id = ?').run(item.id);
+    }
+    // Com as duas top tocadas há pouco, cai no acervo em vez de repetir.
+    const semRepetir = fila.criarAutomatico([a, b], [], { soTop: true }).musica_id;
+    const padroes = configuracoes.lerAutomatico();
+    let recusou = false;
+    try { configuracoes.salvarAutomatico({ volume: 10 }); } catch { recusou = true; }
+    console.log(JSON.stringify({
+      soTop: [...sorteadas].every((id) => id === a || id === b),
+      semRepetir: semRepetir !== a && semRepetir !== b,
+      padroes: { so_top: padroes.so_top, volume: padroes.volume, vinheta: padroes.vinheta, intervalo: padroes.intervalo_min },
+      recusou,
+    }));
+    db.close();
+  `, {}, dados);
+  assert.deepEqual(saida, {
+    soTop: true, semRepetir: true, padroes: { so_top: true, volume: 80, vinheta: true, intervalo: 5 }, recusou: true,
+  });
+});

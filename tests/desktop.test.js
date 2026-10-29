@@ -7,6 +7,23 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const { createSettings, readSettings, lerConfiguracao, salvarConfiguracao, atualizarEnv, externalURL, localURL } = require('../desktop/settings.cjs');
 const { ferramentasEmbutidas } = require('../desktop/ferramentas.cjs');
+const { aplicarLinux } = require('../desktop/inicio-automatico.cjs');
+
+test('abrir ao ligar: a escolha da tela vai para o .env e o atalho do Linux é criado e removido', (t) => {
+  const dir = directory(t);
+  assert.equal(lerConfiguracao(dir).iniciarComSistema, true, 'primeira vez: já vem marcado');
+  salvarConfiguracao(dir, { modo: 'teste', senha: 'senha-bem-forte', porta: 3000, iniciarComSistema: true });
+  assert.equal(readSettings(dir, {}).iniciarComSistema, true);
+  salvarConfiguracao(dir, { modo: 'teste', senha: 'senha-bem-forte', porta: 3000, iniciarComSistema: false });
+  assert.equal(readSettings(dir, {}).iniciarComSistema, false);
+
+  const autostart = path.join(dir, 'autostart');
+  aplicarLinux(true, '/opt/Jukebox Pix/jukebox-pix', autostart);
+  const atalho = fs.readFileSync(path.join(autostart, 'jukebox-pix.desktop'), 'utf8');
+  assert.match(atalho, /^Exec="\/opt\/Jukebox Pix\/jukebox-pix"$/m);
+  aplicarLinux(false, '/opt/Jukebox Pix/jukebox-pix', autostart);
+  assert.equal(fs.existsSync(path.join(autostart, 'jukebox-pix.desktop')), false);
+});
 
 function directory(t) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'jukebox-settings-'));
