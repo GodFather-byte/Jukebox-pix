@@ -297,7 +297,7 @@ Aba **📢 Divulgação**: duas ferramentas para divulgar a casa e **vender espa
 
 ## 9. Músicas da internet (YouTube)
 
-**O que é.** Quando o cliente não acha a música no seu acervo, aparece o botão **"🔎 Pesquisar na internet"**. Ele vê os resultados do YouTube (com miniatura, canal, duração e preço), toca em **🎶 PEDIR** e paga com créditos. A jukebox baixa só o **áudio** e põe na fila: em alguns segundos, ou até uns minutos se a internet estiver ruim. A música fica guardada: se alguém pedir a mesma de novo, entra na fila **na hora**.
+**O que é.** Quando o cliente não acha a música no seu acervo, aparece o botão **"🔎 Pesquisar na internet"**. Ele vê os resultados do YouTube (com miniatura, canal, duração e preço), toca em **🎶 PEDIR** e paga com créditos. A jukebox baixa o **áudio e a capa** daquela música e põe na fila: em alguns segundos, ou até uns minutos se a internet estiver ruim. A música fica guardada: se alguém pedir a mesma de novo, entra na fila **na hora**.
 
 > Você pediu e autorizou esse recurso (02/10/2026). Ele vem **desligado**, e para ligar pela primeira vez o painel pede que você confirme o aviso abaixo.
 

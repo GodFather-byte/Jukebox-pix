@@ -20,6 +20,10 @@ test('readiness do desktop usa o mesmo elemento de montagem do frontend', () => 
   assert.ok(frontend.includes("document.getElementById('raiz')"));
   assert.ok(desktop.includes(`.includes('<div id="raiz">')`));
   assert.ok(desktop.includes('document.querySelector("#raiz")?.children.length'));
+  assert.match(desktop, /fetch\(`\$\{origin\}\/tela`/);
+  assert.match(desktop, /mainWindow = windowFor\(`\$\{origin\}\/tela`/);
+  assert.ok(desktop.includes('Catálogo do cliente'));
+  assert.ok(desktop.includes('Painel administrativo'));
 });
 
 test('primeira execução exige escolha explícita, gera senha segura e não sobrescreve dados', (t) => {

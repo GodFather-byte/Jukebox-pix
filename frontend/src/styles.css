@@ -239,6 +239,7 @@ input[type='file'].campo { padding: 10px 14px; height: auto; }
 .saldo-card { display: grid; gap: 4px; justify-items: center; text-align: center; padding: 22px 16px; border-color: rgba(255, 20, 147, 0.35); }
 .saldo-valor { font-size: 3.4rem; line-height: 1; color: var(--ciano); text-shadow: 0 0 24px rgba(0, 212, 255, 0.45); }
 .saldo-card .btn-grande { margin-top: 14px; }
+.pagar-na-tela { margin: 8px 0 0; color: var(--texto-2); font-size: 0.85rem; }
 
 .carrossel { display: flex; gap: 12px; margin: 0 -16px; padding: 0 16px 8px; overflow-x: auto; scroll-snap-type: x proximity; scroll-padding: 0 16px; scrollbar-width: none; }
 .carrossel::-webkit-scrollbar { display: none; }
@@ -844,3 +845,39 @@ p.bonus-futuro { margin: 0 0 12px; }
 @media (prefers-reduced-motion: reduce) {
   .eq { display: none; }
 }
+
+/* Tela larga: o aplicativo no computador usa a tela inteira para pagar e escolher. */
+@media (min-width: 980px) {
+  .conteudo { max-width: 1080px; }
+  .nav-inferior { max-width: none; }
+  .miniplayer { max-width: none; left: 16px; right: 16px; }
+  .valores { grid-template-columns: repeat(4, 1fr); }
+  .pagamento-qr .qrcode img { width: min(420px, 48vh); height: auto; }
+}
+
+.tela-pagar { width: min(100%, 420px); min-height: 64px; font-size: 1.15rem; }
+.tela-ou { margin: 0; color: var(--texto-3); font-size: 0.8rem; letter-spacing: 0.12em; text-transform: uppercase; }
+
+.balcao {
+  position: fixed; inset: 0; z-index: 55;
+  display: flex; flex-direction: column;
+  background: #0A0E27;
+}
+.balcao-topo {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  padding: 16px 20px; border-bottom: 1px solid var(--borda);
+  background: rgba(10, 14, 39, 0.95);
+}
+.balcao-abas { display: flex; gap: 8px; }
+.balcao-abas button {
+  min-height: 48px; padding: 0 18px; border-radius: 999px;
+  background: var(--superficie); border: 1px solid var(--borda); color: var(--texto-2);
+  font-family: var(--fonte-titulo); font-weight: 700;
+}
+.balcao-abas button.ativo { background: var(--rosa-botao); border-color: var(--rosa); color: #fff; }
+.balcao-tocando { margin: 0; padding: 10px 20px; color: var(--texto-2); background: rgba(0, 212, 255, 0.08); }
+.balcao-tocando strong { color: var(--texto); }
+.balcao-corpo { flex: 1; min-height: 0; overflow: auto; padding: 20px 16px 40px; }
+.balcao-miolo { width: min(760px, 100%); margin: 0 auto; }
+.balcao .qrcode img { width: min(100%, 420px); height: auto; }
+.balcao .btn-fantasma { margin-top: 0; }

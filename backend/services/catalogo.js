@@ -17,7 +17,7 @@ const comPreco = (musicas) => {
 
 const MUSICA_SELECT = `
   SELECT m.id, m.titulo, m.duracao, m.creditos, m.vezes_tocada, m.cd_id, m.oculta, c.oculto AS cd_oculto,
-         c.status AS cd_status, c.titulo AS cd, c.capa,
+         c.status AS cd_status, c.titulo AS cd, COALESCE(m.capa, c.capa) AS capa,
          a.id AS artista_id, a.nome AS artista,
          cat.id AS categoria_id, cat.nome AS categoria, cat.icone, cat.cor
     FROM musicas m
