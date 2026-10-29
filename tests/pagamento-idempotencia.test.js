@@ -29,6 +29,14 @@ test('confirmação repetida de Pix não duplica créditos e cancelamento poster
       assert.equal(cancelado.status, 'confirmado');
       assert.equal(obter(pagamento.id).status, 'confirmado');
       assert.equal(obterSessao(sessao.id).saldo, saldoConfirmado);
+
+      // Mesmo se o QR vencer antes da confirmação, dinheiro recebido deve gerar crédito uma única vez.
+      const atrasado = await iniciar({ valor: 10, sessionId: sessao.id });
+      db.prepare("UPDATE pagamentos SET status = 'falho' WHERE id = ?").run(atrasado.id);
+      assert.equal(confirmar(atrasado.id), true);
+      assert.equal(confirmar(atrasado.id), false);
+      assert.equal(obter(atrasado.id).status, 'confirmado');
+      assert.equal(obterSessao(sessao.id).saldo, saldoConfirmado + atrasado.creditos + atrasado.bonus);
     } finally {
       db.close();
     }
