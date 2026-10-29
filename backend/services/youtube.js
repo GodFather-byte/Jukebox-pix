@@ -49,6 +49,19 @@ export const limparTitulo = (texto) => String(texto ?? '')
 const urlDoVideo = (id) => `https://www.youtube.com/watch?v=${id}`;
 export const miniaturaDe = (id) => `https://i.ytimg.com/vi/${id}/mqdefault.jpg`;
 
+const MIN_CAPA = 80;
+const MAX_CAPA = 4 * 1024 * 1024;
+const EXT_CAPA = ['.jpg', '.png', '.webp'];
+
+// JPEG, PNG ou WebP de verdade. Página de erro e arquivo vazio não passam.
+export function extensaoDeImagem(buffer) {
+  if (!Buffer.isBuffer(buffer) || buffer.length < MIN_CAPA || buffer.length > MAX_CAPA) return null;
+  if (buffer[0] === 0xFF && buffer[1] === 0xD8 && buffer[2] === 0xFF) return '.jpg';
+  if (buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4E && buffer[3] === 0x47) return '.png';
+  if (buffer.length >= 12 && buffer.slice(0, 4).toString('ascii') === 'RIFF' && buffer.slice(8, 12).toString('ascii') === 'WEBP') return '.webp';
+  return null;
+}
+
 // ---------- Execução do programa ----------
 
 // Um script .js no lugar do programa só existe para os testes automáticos.
@@ -319,7 +332,121 @@ async function conferirAudio(caminho, duracaoEsperada) {
   return size;
 }
 
-// Baixa só o áudio para <pasta de músicas>/SobDemanda/<id>.<ext>. Devolve o caminho relativo à pasta de músicas.
+// A capa fica em musicas/capas, nunca em SobDemanda/<id>.*. apagarRestos e a limpeza de órfãos
+// apagam tudo que começa com o ID do vídeo dentro da pasta do áudio.
+const dirCapas = () => path.join(config.musicasDir, 'capas');
+const nomeCapa = (id, ext) => `yt-${id}${ext}`;
+
+function acharCapa(id) {
+  const dir = dirCapas();
+  for (const ext of EXT_CAPA) {
+    const nome = nomeCapa(id, ext);
+    try {
+      const st = fs.statSync(path.join(dir, nome));
+      if (st.isFile() && st.size >= MIN_CAPA && st.size <= MAX_CAPA) return nome;
+    } catch { /* ainda não existe */ }
+  }
+  return null;
+}
+
+function gravarCapa(id, buffer) {
+  const ext = extensaoDeImagem(buffer);
+  if (!ext) return null;
+  const dir = dirCapas();
+  fs.mkdirSync(dir, { recursive: true });
+  const nome = nomeCapa(id, ext);
+  const destino = path.join(dir, nome);
+  const parcial = path.join(dir, `.${nome}.parcial`);
+  try {
+    fs.writeFileSync(parcial, buffer, { mode: 0o644 });
+    fs.renameSync(parcial, destino);
+  } catch {
+    fs.rmSync(parcial, { force: true });
+    return null;
+  }
+  for (const outra of EXT_CAPA) {
+    if (outra !== ext) fs.rmSync(path.join(dir, nomeCapa(id, outra)), { force: true });
+  }
+  return nome;
+}
+
+function enderecosDaCapa(id) {
+  return [
+    `https://i.ytimg.com/vi/${id}/hqdefault.jpg`,
+    miniaturaDe(id),
+  ];
+}
+
+// Miniatura pública do próprio vídeo. Sem redirecionamento: o endereço é só i.ytimg.com + o ID já validado.
+async function capaPelaRede(id) {
+  if (process.env.JUKEBOX_CAPA_HTTP === '0') return null;
+  for (const url of enderecosDaCapa(id)) {
+    try {
+      const resposta = await fetch(url, {
+        redirect: 'error',
+        signal: AbortSignal.timeout(8000),
+        headers: { Accept: 'image/jpeg,image/png,image/webp' },
+      });
+      if (!resposta.ok) continue;
+      const tipo = (resposta.headers.get('content-type') || '').toLowerCase();
+      if (tipo.startsWith('text/') || tipo.includes('html') || tipo.includes('json')) continue;
+      const nome = gravarCapa(id, Buffer.from(await resposta.arrayBuffer()));
+      if (nome) return nome;
+    } catch { /* tenta o próximo endereço */ }
+  }
+  return null;
+}
+
+// O yt-dlp grava a miniatura num diretório temporário. Só o conteúdo validado vai para capas/yt-<id>.<ext>.
+async function capaPeloPrograma(id) {
+  const tmp = path.join(dirCapas(), `.tmp-${id}`);
+  fs.rmSync(tmp, { recursive: true, force: true });
+  fs.mkdirSync(tmp, { recursive: true });
+  try {
+    const r = await executar([
+      ...argumentosBase(),
+      '--no-playlist', '--skip-download', '--write-thumbnail', '--no-mtime', '--no-progress',
+      '-o', path.join(tmp, 'capa.%(ext)s'),
+      '--', urlDoVideo(id),
+    ], { tempoMs: Math.min(config.youtube.tempoBuscaS * 1000, 25_000) });
+    if (r.codigo !== 0) return null;
+    for (const nome of fs.readdirSync(tmp)) {
+      if (nome !== path.basename(nome)) continue;
+      const caminho = path.join(tmp, nome);
+      if (path.resolve(caminho).startsWith(path.resolve(tmp) + path.sep) === false) continue;
+      let st;
+      try { st = fs.lstatSync(caminho); } catch { continue; }
+      if (!st.isFile()) continue;
+      const salvo = gravarCapa(id, fs.readFileSync(caminho));
+      if (salvo) return salvo;
+    }
+    return null;
+  } catch {
+    return null;
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+}
+
+const capasEmCurso = new Map();
+
+// Baixa a capa daquele vídeo. Falha (rede, yt-dlp, arquivo inválido) devolve null e não atrapalha o áudio.
+export function baixarCapa(id) {
+  if (!idValido(id)) return Promise.resolve(null);
+  const pronta = acharCapa(id);
+  if (pronta) return Promise.resolve(pronta);
+  let tarefa = capasEmCurso.get(id);
+  if (!tarefa) {
+    tarefa = (async () => (await capaPelaRede(id)) ?? capaPeloPrograma(id))()
+      .catch(() => null)
+      .finally(() => capasEmCurso.delete(id));
+    capasEmCurso.set(id, tarefa);
+  }
+  return tarefa;
+}
+
+// Baixa o áudio para <pasta de músicas>/SobDemanda/<id>.<ext> e, depois, a capa em musicas/capas.
+// Devolve o caminho do áudio (relativo à pasta de músicas) e o nome da capa, ou null se a imagem não vier.
 // A duração máxima também vai para o yt-dlp (--match-filter), então um vídeo longo é recusado mesmo que o pedido minta.
 export function baixar(id, { maxSegundos, duracaoEsperada = null }) {
   return limiteBaixar(async () => {
@@ -360,13 +487,17 @@ export function baixar(id, { maxSegundos, duracaoEsperada = null }) {
         : 'O yt-dlp terminou sem gerar o arquivo de áudio.');
     }
 
+    let bytes;
     try {
-      const bytes = await conferirAudio(path.join(config.youtube.pasta, nome), duracaoEsperada);
-      return { arquivo: relativoDaPasta(nome), bytes };
+      bytes = await conferirAudio(path.join(config.youtube.pasta, nome), duracaoEsperada);
     } catch (erro) {
       apagarRestos(id);
       throw erro;
     }
+    // A capa é extra: se não vier, a música segue sem ela e o crédito não volta.
+    let capa = null;
+    try { capa = await baixarCapa(id); } catch { capa = null; }
+    return { arquivo: relativoDaPasta(nome), bytes, capa };
   });
 }
 

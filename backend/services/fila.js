@@ -8,7 +8,7 @@ import { creditar, debitar, obterSessao, rotulo } from './sessoes.js';
 const ITEM_SELECT = `
   SELECT f.id, f.session_id, f.posicao, f.status, f.creditos, f.creditos_cortesia, f.prioridade, f.iniciado_em, f.fim_previsto_em,
          m.id AS musica_id, m.titulo, m.duracao, m.arquivo, m.lufs, m.pico_db,
-         c.titulo AS cd, c.capa, a.nome AS artista, cat.icone, cat.cor
+         c.titulo AS cd, COALESCE(m.capa, c.capa) AS capa, a.nome AS artista, cat.icone, cat.cor
     FROM fila f
     JOIN musicas m ON m.id = f.musica_id
     JOIN cds c ON c.id = m.cd_id

@@ -59,9 +59,14 @@ function windowFor(url, title) {
     return { action: 'deny' };
   });
   win.webContents.on('will-attach-webview', (event) => event.preventDefault());
-  win.webContents.session.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
-  win.webContents.session.setPermissionCheckHandler(() => false);
+  // A tela cheia do telão é o próprio aplicativo. O resto (câmera, notificação, microfone) continua negado.
+  const permitir = (_contents, permission) => permission === 'fullscreen';
+  win.webContents.session.setPermissionRequestHandler((contents, permission, callback) => callback(permitir(contents, permission)));
+  win.webContents.session.setPermissionCheckHandler(permitir);
   win.webContents.on('page-title-updated', (event) => event.preventDefault());
+  win.on('closed', () => {
+    if (mainWindow === win) mainWindow = null;
+  });
   win.loadURL(url).catch(() => fail('FRONTEND'));
   return win;
 }
@@ -69,7 +74,16 @@ function windowFor(url, title) {
 function installMenu(origin, info, settings) {
   Menu.setApplicationMenu(Menu.buildFromTemplate([
     { label: 'Jukebox Pix', submenu: [
-      { label: 'Painel administrativo', click: () => mainWindow?.loadURL(`${origin}/admin`) },
+      { label: 'Tela do jukebox', click: () => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.loadURL(`${origin}/tela`);
+          if (mainWindow.isMinimized()) mainWindow.restore();
+          mainWindow.show();
+          mainWindow.focus();
+        } else mainWindow = windowFor(`${origin}/tela`, settings.test ? 'Jukebox Pix — MODO DE TESTE LOCAL' : 'Jukebox Pix');
+      } },
+      { label: 'Catálogo do cliente', click: () => windowFor(`${origin}/`, 'Jukebox Pix — Catálogo') },
+      { label: 'Painel administrativo', click: () => windowFor(`${origin}/admin`, 'Jukebox Pix — Administração') },
       { label: 'Abrir telão', click: () => windowFor(`${origin}/tela`, 'Jukebox Pix — Telão') },
       { label: 'Endereço dos clientes / rede', click: async () => {
         const address = settings.test ? `${origin} (teste: somente neste computador)` : info.clientUrl;
@@ -166,10 +180,11 @@ async function run() {
       // Readiness privada acima comprova a posse da porta; HTTP confirma SQLite e arquivos do pacote.
       const health = await fetch(`${origin}/healthz`, { signal: AbortSignal.timeout(10000) });
       if (!health.ok || (await health.json()).ok !== true) throw new Error();
-      const frontend = await fetch(`${origin}/admin`, { signal: AbortSignal.timeout(10000) });
+      const frontend = await fetch(`${origin}/tela`, { signal: AbortSignal.timeout(10000) });
       if (!frontend.ok || !(await frontend.text()).includes('<div id="raiz">')) throw new Error();
       installMenu(origin, info, settings);
-      mainWindow = windowFor(`${origin}/admin`, settings.test ? 'Jukebox Pix — MODO DE TESTE LOCAL' : 'Jukebox Pix');
+      mainWindow = windowFor(`${origin}/tela`, settings.test ? 'Jukebox Pix — MODO DE TESTE LOCAL' : 'Jukebox Pix');
+      if (!smoke) mainWindow.maximize();
       log('PRONTO');
       if (smoke) {
         mainWindow.webContents.once('did-finish-load', async () => {

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Capa from './Capa.jsx';
 import Destaque from './Destaque.jsx';
-import { formatarDuracao } from '../api.js';
+import { formatarDuracao, irParaPagamento } from '../api.js';
 import { useSessao } from '../context/Sessao.jsx';
 import { useToast } from '../context/Toast.jsx';
 import { useFavoritos } from '../favoritos.js';
@@ -44,7 +44,7 @@ export default function MusicaItem({ musica, posicao, numero, mostrarCapa = true
       setEstado('ocioso');
       mostrarToast(erro.message, {
         tipo: 'erro',
-        acao: erro.codigo === 'SALDO_INSUFICIENTE' ? { texto: 'PAGAR', aoClicar: () => navigate('/pagar') } : undefined,
+        acao: erro.codigo === 'SALDO_INSUFICIENTE' ? { texto: 'PAGAR', aoClicar: () => irParaPagamento(navigate) } : undefined,
       });
     }
   }
