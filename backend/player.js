@@ -26,6 +26,7 @@ let pausado = false;
 let intervalo = null;
 let recentes = [];
 let automaticoLivreEm = 0;
+let silencioDesde = Date.now(); // quando a última música acabou (ou o player ligou)
 let desdeVinheta = 0; // músicas tocadas desde a última vinheta
 let falhasSeguidas = 0;
 let encerrando = false;
@@ -98,7 +99,9 @@ function tick() {
 
   let item = fila.proximo();
   // Fila vazia: se o modo automático estiver ligado, sorteia uma música pra não deixar o salão em silêncio.
-  if (!item && Date.now() >= automaticoLivreEm && configuracoes.automaticoAtivo()) {
+  // Com intervalo, espera esse tempo de silêncio antes: a máquina "chama" o cliente sem tocar sem parar de graça.
+  const intervaloMs = configuracoes.automaticoIntervaloMin() * 60_000;
+  if (!item && Date.now() >= automaticoLivreEm && Date.now() - silencioDesde >= intervaloMs && configuracoes.automaticoAtivo()) {
     item = fila.criarAutomatico(recentes, configuracoes.categoriasDaAutomatica());
   }
   if (item) tocar(item);
@@ -201,6 +204,7 @@ function terminar(item, sucesso) {
   clearTimeout(atual?.timer);
   const automatica = atual?.automatica;
   atual = null;
+  silencioDesde = Date.now();
 
   if (sucesso) {
     falhasSeguidas = 0;
@@ -223,6 +227,7 @@ function terminar(item, sucesso) {
 export function iniciar() {
   encerrando = false;
   backend = escolherBackend();
+  silencioDesde = Date.now();
   fila.recuperarTocando();
   intervalo = setInterval(tick, 2000);
   tick();

@@ -7,6 +7,7 @@ import * as yt from './youtube.js';
 const PADROES = {
   automatico: '1', // toca música aleatória quando a fila está vazia
   automatico_interrompe: '0', // corta a aleatória assim que alguém pede uma música
+  automatico_intervalo_min: '5', // minutos de silêncio antes de cada aleatória (0 = uma atrás da outra)
   automatico_categorias: '[]', // categorias sorteadas ([] = todas)
   automatico_agenda: '[]', // [{ inicio, fim, categorias }]: por horário, a primeira janela que casa vale
   vendas_abertas: '1', // chave manual: desligado, não gera Pix novo (quem já tem crédito continua usando)
@@ -102,18 +103,21 @@ function categoriasValidas(lista, nome) {
 
 export const automaticoAtivo = () => lerBool('automatico');
 export const automaticoInterrompe = () => lerBool('automatico_interrompe');
+export const automaticoIntervaloMin = () => Math.min(120, Math.max(0, lerInt('automatico_intervalo_min')));
 
 export const lerAutomatico = () => ({
   ativo: automaticoAtivo(),
   interrompe: automaticoInterrompe(),
+  intervalo_min: automaticoIntervaloMin(),
   categorias: lerJson('automatico_categorias'),
   agenda: lerJson('automatico_agenda'),
 });
 
-export function salvarAutomatico({ ativo, interrompe, categorias, agenda } = {}) {
+export function salvarAutomatico({ ativo, interrompe, intervalo_min: intervaloMin, categorias, agenda } = {}) {
   const novos = {};
   if (ativo !== undefined) novos.automatico = ativo ? '1' : '0';
   if (interrompe !== undefined) novos.automatico_interrompe = interrompe ? '1' : '0';
+  if (intervaloMin !== undefined) novos.automatico_intervalo_min = inteiroEntre(intervaloMin, 0, 120, 'Intervalo da playlist automática');
   if (categorias !== undefined) novos.automatico_categorias = JSON.stringify(categoriasValidas(categorias, 'Categorias da playlist'));
   if (agenda !== undefined) {
     if (!Array.isArray(agenda) || agenda.length > 10) throw new ErroApi(400, 'A agenda aceita até 10 janelas de horário.');

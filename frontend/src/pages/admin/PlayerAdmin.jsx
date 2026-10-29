@@ -83,8 +83,17 @@ export default function PlayerAdmin({ chamar, versao }) {
           <span className="interruptor-trilho" aria-hidden="true" />
           <span>
             <strong>🎲 Playlist automática</strong>
-            <small>Quando a fila esvazia, toca uma música aleatória do acervo para o salão não ficar em silêncio. Não conta no ranking nem no faturamento.</small>
+            <small>Quando ninguém pede música, toca uma aleatória do acervo para chamar o cliente. Não conta no ranking nem no faturamento.</small>
           </span>
+        </label>
+        <label className="campo-rotulo">
+          Tocar uma aleatória depois de quanto tempo de silêncio
+          <select className="campo" value={estado.automatico.intervalo_min} disabled={!estado.automatico.ativo}
+            onChange={(e) => acao('/admin/automatico', { metodo: 'PUT', corpo: { intervalo_min: Number(e.target.value) } })}>
+            {[0, 1, 2, 5, 10, 15, 30].map((m) => (
+              <option key={m} value={m}>{m === 0 ? 'Na hora (uma atrás da outra)' : `${m} ${m === 1 ? 'minuto' : 'minutos'}`}</option>
+            ))}
+          </select>
         </label>
         <label className="interruptor" aria-disabled={!estado.automatico.ativo}>
           <input type="checkbox" checked={estado.automatico.interrompe} disabled={!estado.automatico.ativo}

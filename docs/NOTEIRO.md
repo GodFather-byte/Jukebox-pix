@@ -76,6 +76,6 @@ Com a placa ligada, dá para testar pelo Monitor Serial do Arduino: digitar `5` 
 ## Cuidados
 
 - O noteiro credita mesmo com as **vendas encerradas** no painel: o dinheiro já entrou na máquina.
-- Os créditos vencem como os outros (`SESSAO_TTL_MIN`, padrão 60 min sem uso). Para o saldo deixado na máquina durar
-  mais, aumente esse valor no `.env`.
+- Os créditos não vencem: o saldo deixado na máquina fica para o próximo cliente. Para fazê-los vencer depois de um
+  tempo sem uso, defina `SESSAO_TTL_MIN` (em minutos) no `.env`.
 - Esvazie o noteiro e confira com o relatório (*Relatório* → Pix · Cartão · Notas).
