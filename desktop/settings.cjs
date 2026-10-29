@@ -30,7 +30,98 @@ function createSettings(directory, mode) {
   fs.writeFileSync(path.join(directory, '.env'), text, { flag: 'wx', mode: 0o600 });
 }
 
-function readSettings(directory, inherited = process.env) {
+// Valor seguro para o .env: senha digitada pelo dono pode ter espaço, #, aspas. Aspas simples e crase são literais no dotenv.
+function valorEnv(valor) {
+  const texto = String(valor ?? '');
+  if (/[\r\n]/.test(texto)) throw new Error('O valor não pode ter quebra de linha.');
+  if (/^[\w@%+=:,./-]*$/.test(texto)) return texto;
+  if (!texto.includes("'")) return `'${texto}'`;
+  if (!texto.includes('`')) return `\`${texto}\``;
+  if (!texto.includes('"') && !texto.includes('\\')) return `"${texto}"`;
+  throw new Error('Use no máximo dois tipos de aspas (\', ", `) no mesmo valor.');
+}
+
+// Troca (ou acrescenta) só as chaves pedidas e mantém o resto do arquivo como o dono deixou.
+function atualizarEnv(texto, valores) {
+  const vistos = new Set();
+  const linhas = [];
+  for (const linha of texto.split(/\r?\n/)) {
+    const chave = linha.match(/^\s*(?:export\s+)?([\w.-]+)\s*=/)?.[1];
+    if (chave && Object.hasOwn(valores, chave)) {
+      if (!vistos.has(chave)) linhas.push(`${chave}=${valorEnv(valores[chave])}`);
+      vistos.add(chave); // repetidas mais abaixo valeriam por cima: saem
+    } else linhas.push(linha);
+  }
+  while (linhas.length && linhas.at(-1) === '') linhas.pop();
+  for (const [chave, valor] of Object.entries(valores)) if (!vistos.has(chave)) linhas.push(`${chave}=${valorEnv(valor)}`);
+  return `${linhas.join('\n')}\n`;
+}
+
+// Sugestão para a tela: só letras e números fáceis de ler e de digitar no celular (sem 0/O, 1/l/I).
+function senhaAleatoria(tamanho = 14) {
+  const letras = 'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  return Array.from({ length: tamanho }, () => letras[crypto.randomInt(letras.length)]).join('');
+}
+
+// O que a tela de configuração mostra. O token não sai daqui: a tela só sabe se ele existe.
+function lerConfiguracao(directory) {
+  const file = path.join(directory, '.env');
+  if (!fs.existsSync(file)) {
+    return { existe: false, modo: 'producao', nomeLocal: '', senha: senhaAleatoria(), porta: 3000, temToken: false };
+  }
+  const values = dotenv.parse(fs.readFileSync(file));
+  return {
+    existe: true,
+    modo: values.DESKTOP_MODE === 'teste' ? 'teste' : 'producao',
+    nomeLocal: values.NOME_LOCAL || '',
+    senha: values.ADMIN_PASSWORD || '',
+    porta: Number(values.PORT || 3000),
+    temToken: Boolean(values.MERCADOPAGO_ACCESS_TOKEN?.trim()),
+  };
+}
+
+// Grava o que o dono preencheu na tela de configuração. Token em branco mantém o que já estava.
+// Se o resultado não passar na validação de readSettings, o arquivo anterior volta e o erro sobe para a tela.
+function salvarConfiguracao(directory, campos) {
+  const modo = campos.modo;
+  if (!['teste', 'producao'].includes(modo)) throw new Error('Escolha produção ou teste.');
+  const senha = String(campos.senha ?? '');
+  if (senha.length < 12 || senha === 'admin') throw new Error('A senha do painel precisa ter pelo menos 12 caracteres.');
+  const porta = Number(campos.porta);
+  if (!Number.isInteger(porta) || porta < 1024 || porta > 65535) throw new Error('A porta deve ser um número entre 1024 e 65535.');
+  const nomeLocal = String(campos.nomeLocal ?? '').trim();
+  if (nomeLocal.length > 40) throw new Error('O nome do local pode ter no máximo 40 letras.');
+  const token = String(campos.token ?? '').trim();
+
+  const file = path.join(directory, '.env');
+  const existia = fs.existsSync(file);
+  if (!existia) createSettings(directory, modo);
+  const anterior = fs.readFileSync(file, 'utf8');
+  const atuais = dotenv.parse(anterior);
+  if (modo === 'producao' && !token && !atuais.MERCADOPAGO_ACCESS_TOKEN?.trim()) {
+    if (!existia) fs.rmSync(file);
+    throw new Error('Para atender clientes, cole o Access Token da sua conta Mercado Pago.');
+  }
+  const valores = { DESKTOP_MODE: modo, ADMIN_PASSWORD: senha, PORT: String(porta), NOME_LOCAL: nomeLocal };
+  if (token) valores.MERCADOPAGO_ACCESS_TOKEN = token;
+  // Rede, provedor e player só mudam junto com o modo: ajuste manual do dono (PLAYER=vlc, HOST=IP) fica.
+  if (atuais.DESKTOP_MODE !== modo || !existia) {
+    Object.assign(valores, modo === 'teste'
+      ? { HOST: '127.0.0.1', PAYMENT_PROVIDER: 'mock', PLAYER: 'sim' }
+      : { HOST: '0.0.0.0', PAYMENT_PROVIDER: 'mercadopago', PLAYER: 'auto' });
+  }
+  if (!atuais.ADMIN_SECRET || atuais.ADMIN_SECRET.length < 32) valores.ADMIN_SECRET = crypto.randomBytes(32).toString('hex');
+  fs.writeFileSync(file, atualizarEnv(anterior, valores), { mode: 0o600 });
+  try {
+    readSettings(directory, {});
+  } catch (error) {
+    if (existia) fs.writeFileSync(file, anterior, { mode: 0o600 });
+    else fs.rmSync(file);
+    throw error;
+  }
+}
+
+function readSettings(directory, inherited = process.env, ferramentas = {}) {
   const values = dotenv.parse(fs.readFileSync(path.join(directory, '.env')));
   const test = values.DESKTOP_MODE === 'teste';
   if (!test && values.DESKTOP_MODE !== 'producao') {
@@ -50,13 +141,15 @@ function readSettings(directory, inherited = process.env) {
   // A configuração local é a autoridade: variáveis herdadas não podem mudar caminhos ou credenciais.
   const env = Object.fromEntries(Object.entries(inherited).filter(([key]) =>
     /^(PATH|Path|SYSTEMROOT|SystemRoot|WINDIR|COMSPEC|PATHEXT|TEMP|TMP|TMPDIR|HOME|USERPROFILE|APPDATA|LOCALAPPDATA|LANG|LC_ALL|DISPLAY|XAUTHORITY|XDG_RUNTIME_DIR|DBUS_SESSION_BUS_ADDRESS)$/i.test(key)));
-  Object.assign(env, values, {
+  // Ferramentas do instalador entram por baixo: um caminho escrito no .env vale mais.
+  Object.assign(env, ferramentas, values, {
     JUKEBOX_DATA_DIR: directory,
     DOTENV_CONFIG_PATH: path.join(directory, '.env'),
     DOTENV_CONFIG_QUIET: 'true',
     NODE_ENV: test ? 'development' : 'production',
     PORT: String(port),
   });
+  for (const [chave, valor] of Object.entries(ferramentas)) if (!env[chave]) env[chave] = valor; // "MPV_PATH=" vazio
   if (test) Object.assign(env, { HOST: '127.0.0.1', PAYMENT_PROVIDER: 'mock', PLAYER: values.PLAYER || 'sim', PUBLIC_URL: '' });
   return { env, port, test };
 }
@@ -80,4 +173,4 @@ function localURL(value, origin) {
   }
 }
 
-module.exports = { createSettings, readSettings, externalURL, localURL };
+module.exports = { createSettings, readSettings, lerConfiguracao, salvarConfiguracao, atualizarEnv, externalURL, localURL };

@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:">
+<title>Configurar o Jukebox Pix</title>
+<link rel="stylesheet" href="configurar.css">
+</head>
+<body>
+<main>
+  <header>
+    <h1>🎵 Configurar o Jukebox Pix</h1>
+    <p id="subtitulo">Preencha uma vez e o jukebox já abre pronto para tocar.</p>
+  </header>
+
+  <div id="erro-inicial" class="aviso erro" hidden></div>
+
+  <form id="form" autocomplete="off">
+    <section>
+      <h2>1. Como vai usar</h2>
+      <div class="modos">
+        <label class="modo">
+          <input type="radio" name="modo" value="producao">
+          <span><strong>Atender clientes</strong><small>Pix de verdade pelo Mercado Pago e som real. Os celulares da rede Wi-Fi acessam.</small></span>
+        </label>
+        <label class="modo">
+          <input type="radio" name="modo" value="teste">
+          <span><strong>Só experimentar</strong><small>Créditos grátis, sem cobrança e sem som. Só funciona neste computador.</small></span>
+        </label>
+      </div>
+    </section>
+
+    <section>
+      <h2>2. O local</h2>
+      <label class="campo">Nome do local (aparece no Pix e nos avisos)
+        <input id="nomeLocal" maxlength="40" placeholder="Ex.: Boate Estrela">
+      </label>
+      <label class="campo">Senha do painel administrativo
+        <span class="linha">
+          <input id="senha" minlength="12" required spellcheck="false">
+          <button type="button" id="gerar" class="secundario">Gerar outra</button>
+          <button type="button" id="copiar" class="secundario">Copiar</button>
+        </span>
+        <small>Pelo menos 12 caracteres. Anote: é com ela que você entra no painel.</small>
+      </label>
+    </section>
+
+    <section id="secao-pix">
+      <h2>3. Pix (Mercado Pago)</h2>
+      <label class="campo">Access Token de produção
+        <span class="linha">
+          <input id="token" type="password" spellcheck="false" placeholder="APP_USR-...">
+          <button type="button" id="mostrar-token" class="secundario">Mostrar</button>
+          <button type="button" id="testar" class="secundario">Testar</button>
+        </span>
+        <small id="token-ajuda">No Mercado Pago: Seu negócio → Configurações → Credenciais.
+          <a href="#" data-link="https://www.mercadopago.com.br/developers/panel/app">Abrir o painel de credenciais</a></small>
+      </label>
+      <div id="token-resultado" class="aviso" hidden></div>
+    </section>
+
+    <section>
+      <h2 id="titulo-ferramentas">4. Som e ferramentas</h2>
+      <ul id="ferramentas" class="ferramentas"></ul>
+    </section>
+
+    <details>
+      <summary>Avançado</summary>
+      <label class="campo">Porta do servidor
+        <input id="porta" type="number" min="1024" max="65535" required>
+        <small>Troque só se outro programa já usa a 3000. Outros ajustes ficam no menu Jukebox Pix → Editar configuração (.env).</small>
+      </label>
+    </details>
+
+    <div id="erro" class="aviso erro" hidden></div>
+
+    <footer>
+      <button type="button" id="cancelar" class="secundario">Cancelar</button>
+      <button type="submit" id="salvar">Salvar e abrir</button>
+    </footer>
+  </form>
+</main>
+<script src="configurar.js"></script>
+</body>
+</html>

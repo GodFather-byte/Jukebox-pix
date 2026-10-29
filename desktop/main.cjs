@@ -3,6 +3,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const { createSettings, readSettings, externalURL, localURL } = require('./settings.cjs');
+const { ferramentasEmbutidas, situacaoFerramentas } = require('./ferramentas.cjs');
+const { abrirConfiguracao } = require('./configuracao.cjs');
 
 app.setName('Jukebox Pix');
 const smoke = process.argv.includes('--desktop-smoke-test');
@@ -20,6 +22,23 @@ let stopped = false;
 let exitCode = 0;
 let startupError;
 let logFile;
+let ferramentas = {};
+let configurando = false; // a tela de configuração fecha antes da janela principal abrir: não é para sair
+
+// No instalador as ferramentas ficam em resources/ferramentas; rodando do código, em ferramentas/<win|linux>.
+function pastaFerramentas() {
+  return app.isPackaged
+    ? path.join(process.resourcesPath, 'ferramentas')
+    : path.join(app.getAppPath(), 'ferramentas', process.platform === 'win32' ? 'win' : 'linux');
+}
+
+// Reabre o aplicativo para o servidor subir com a configuração nova.
+async function configurarEReiniciar() {
+  if (await abrirConfiguracao({ dataDir, ferramentas }) === 'salvo') {
+    app.relaunch();
+    app.quit();
+  }
+}
 
 function log(event) {
   // Somente eventos controlados: nunca copie stdout/stderr, URLs ou erros com credenciais para o log.
@@ -38,8 +57,8 @@ function fail(code) {
   smokeResult({ ok: false, code });
   if (!smoke) dialog.showErrorBox('Não foi possível iniciar o Jukebox Pix',
     code === 'EADDRINUSE'
-      ? 'A porta configurada já está em uso. Feche o outro programa ou altere PORT no arquivo .env da pasta de dados. Nenhum servidor existente foi aberto.'
-      : 'O backend não iniciou ou parou inesperadamente. Confira o arquivo .env, a instalação do mpv/VLC e a pasta de dados. Em produção é necessário configurar o Mercado Pago. Nenhuma credencial foi registrada no log.');
+      ? 'A porta configurada já está em uso. Feche o outro programa ou troque a porta em Jukebox Pix → Configurações (Avançado). Nenhum servidor existente foi aberto.'
+      : 'O servidor não iniciou ou parou inesperadamente. Confira a configuração (menu Jukebox Pix → Configurações), o player (mpv/VLC) e a pasta de dados. Nenhuma credencial foi registrada no log.');
   app.quit();
 }
 
@@ -95,11 +114,12 @@ function installMenu(origin, info, settings) {
         if (response === 1) clipboard.writeText(settings.test ? origin : info.clientUrl);
       } },
       { type: 'separator' },
+      { label: 'Configurações…', click: configurarEReiniciar },
       { label: 'Abrir pasta de dados e logs', click: () => shell.openPath(dataDir) },
-      { label: 'Editar configuração (.env)', click: () => shell.openPath(path.join(dataDir, '.env')) },
+      { label: 'Editar configuração avançada (.env)', click: () => shell.openPath(path.join(dataDir, '.env')) },
       { label: 'Sobre a configuração', click: () => dialog.showMessageBox({
         type: 'info', message: 'Feche o aplicativo antes de editar ou migrar dados.',
-        detail: `Dados e configuração:\n${dataDir}\n\nA senha administrativa está no arquivo .env. Alterações passam a valer na próxima abertura. Nunca compartilhe esse arquivo.`,
+        detail: `Dados e configuração:\n${dataDir}\n\nSenha, Pix e porta mudam em Jukebox Pix → Configurações. O resto fica no arquivo .env, que vale na próxima abertura. Nunca compartilhe esse arquivo.`,
       }) },
       { type: 'separator' }, { label: 'Sair', click: () => app.quit() },
     ] },
@@ -112,39 +132,42 @@ async function run() {
   logFile = path.join(dataDir, 'logs', 'desktop.log');
   // Limite simples para que o registro sanitizado não cresça indefinidamente.
   if (fs.existsSync(logFile) && fs.statSync(logFile).size > 1024 * 1024) fs.renameSync(logFile, `${logFile}.old`);
+  ferramentas = ferramentasEmbutidas(pastaFerramentas(), dataDir);
   const envFile = path.join(dataDir, '.env');
-  if (!fs.existsSync(envFile)) {
-    const response = smoke ? 1 : (await dialog.showMessageBox({
-      type: 'question', title: 'Bem-vindo ao Jukebox Pix',
-      message: 'Escolha como configurar o primeiro uso',
-      detail: 'Produção: configure seu Pix Mercado Pago e instale mpv/VLC antes de atender clientes.\nTeste local: créditos grátis e player simulado, sem acesso pela rede. Nenhuma opção inicia com a senha padrão.',
-      buttons: ['Configurar produção', 'Experimentar em modo teste local', 'Cancelar'],
-      defaultId: 0, cancelId: 2, noLink: true,
-    })).response;
-    if (response === 2) return app.quit();
-    createSettings(dataDir, response === 1 ? 'teste' : 'producao');
-    if (response === 0) {
-      await dialog.showMessageBox({ type: 'info', message: 'Configuração criada com senha aleatória.',
-        detail: 'No arquivo .env, confira ADMIN_PASSWORD e preencha MERCADOPAGO_ACCESS_TOKEN. Instale mpv/VLC. O servidor ainda não foi iniciado. Salve o arquivo e reabra o aplicativo.' });
-      await shell.openPath(envFile);
-      await shell.openPath(dataDir);
-      return app.quit();
+  if (smoke && !fs.existsSync(envFile)) createSettings(dataDir, 'teste');
+  // Primeira vez ou configuração inválida: a tela de configuração no lugar de editar o .env na mão.
+  let erroConfig = fs.existsSync(envFile) ? null : '';
+  let settings;
+  for (;;) {
+    if (erroConfig !== null) {
+      if (smoke) {
+        smokeResult({ ok: false, code: 'CONFIG' });
+        exitCode = 1;
+        return app.quit();
+      }
+      configurando = true;
+      // Fica ligado até a janela principal abrir: o "todas as janelas fechadas" da tela chega depois daqui.
+      if (await abrirConfiguracao({ dataDir, ferramentas, erro: erroConfig }) !== 'salvo') return app.quit();
+    }
+    try {
+      settings = readSettings(dataDir, process.env, ferramentas);
+      break;
+    } catch (error) {
+      erroConfig = `A configuração precisa de ajuste: ${error.message}`;
     }
   }
-  let settings;
-  try { settings = readSettings(dataDir); } catch (error) {
-    if (!smoke) {
-      await dialog.showMessageBox({ type: 'error', message: 'Revise a configuração local', detail: error.message });
-      await shell.openPath(dataDir);
-    }
-    smokeResult({ ok: false, code: 'CONFIG' });
-    exitCode = 1;
+  if (!settings.test && !smoke && !situacaoFerramentas(settings.env).player) {
+    await dialog.showMessageBox({ type: 'warning', message: 'Falta o player de áudio',
+      detail: process.platform === 'win32'
+        ? 'Nenhum mpv ou VLC foi encontrado. Instale o VLC (videolan.org) e abra o Jukebox Pix de novo.'
+        : 'Nenhum mpv ou VLC foi encontrado. Instale com "sudo apt install mpv" e abra o Jukebox Pix de novo.' });
     return app.quit();
   }
-  if (settings.test && !smoke) {
+  // Quem acabou de escolher "Só experimentar" na tela não precisa confirmar de novo.
+  if (settings.test && !smoke && erroConfig === null) {
     const { response } = await dialog.showMessageBox({
       type: 'warning', message: 'MODO DE TESTE LOCAL',
-      detail: 'Os créditos são grátis. O player pode ser simulado (sem áudio). Os celulares na rede não poderão acessar. A senha administrativa está no arquivo .env.',
+      detail: 'Os créditos são grátis. O player pode ser simulado (sem áudio). Os celulares na rede não poderão acessar. Para atender clientes, use Jukebox Pix → Configurações.',
       buttons: ['Continuar teste local', 'Fechar'], defaultId: 1, cancelId: 1,
     });
     if (response !== 0) return app.quit();
@@ -184,6 +207,7 @@ async function run() {
       if (!frontend.ok || !(await frontend.text()).includes('<div id="raiz">')) throw new Error();
       installMenu(origin, info, settings);
       mainWindow = windowFor(`${origin}/tela`, settings.test ? 'Jukebox Pix — MODO DE TESTE LOCAL' : 'Jukebox Pix');
+      configurando = false;
       if (!smoke) mainWindow.maximize();
       log('PRONTO');
       if (smoke) {
@@ -222,7 +246,7 @@ if (!app.requestSingleInstanceLock()) {
   app.on('web-contents-created', (_event, contents) => {
     contents.on('will-attach-webview', (event) => event.preventDefault());
   });
-  app.on('window-all-closed', () => app.quit());
+  app.on('window-all-closed', () => { if (!configurando) app.quit(); });
   app.on('before-quit', (event) => {
     if (stopped || !backend) {
       if (exitCode) app.exit(exitCode);

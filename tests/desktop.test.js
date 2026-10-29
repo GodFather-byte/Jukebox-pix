@@ -4,7 +4,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
-const { createSettings, readSettings, externalURL, localURL } = createRequire(import.meta.url)('../desktop/settings.cjs');
+const require = createRequire(import.meta.url);
+const { createSettings, readSettings, lerConfiguracao, salvarConfiguracao, atualizarEnv, externalURL, localURL } = require('../desktop/settings.cjs');
+const { ferramentasEmbutidas } = require('../desktop/ferramentas.cjs');
 
 function directory(t) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'jukebox-settings-'));
@@ -91,4 +93,78 @@ test('navegação é restrita à origem local e links externos à lista HTTPS pe
   for (const url of ['http://mpv.io', 'https://mpv.io.evil.test', '******mpv.io', 'https://mpv.io:444', 'file:///tmp/test', 'https://example.org']) {
     assert.equal(externalURL(url), false);
   }
+});
+
+test('tela de configuração grava o .env, mantém ajustes do dono e não aceita produção sem token', (t) => {
+  const dir = directory(t);
+  const novo = lerConfiguracao(dir);
+  assert.equal(novo.existe, false);
+  assert.ok(novo.senha.length >= 12);
+  assert.throws(() => salvarConfiguracao(dir, { modo: 'producao', senha: 'senha-bem-forte', porta: 3000 }), /Access Token/);
+  assert.equal(fs.existsSync(path.join(dir, '.env')), false, 'falha na primeira vez não deixa .env pela metade');
+  assert.throws(() => salvarConfiguracao(dir, { modo: 'teste', senha: 'curta', porta: 3000 }), /12 caracteres/);
+  assert.throws(() => salvarConfiguracao(dir, { modo: 'teste', senha: 'senha-bem-forte', porta: 80 }), /porta/);
+
+  salvarConfiguracao(dir, { modo: 'producao', nomeLocal: 'Boate Estrela', senha: 'minha senha #1 "forte"', porta: 3100, token: 'APP_USR-ficticio' });
+  let { env, port, test } = readSettings(dir, {});
+  assert.equal(test, false);
+  assert.equal(port, 3100);
+  assert.equal(env.ADMIN_PASSWORD, 'minha senha #1 "forte"');
+  assert.equal(env.NOME_LOCAL, 'Boate Estrela');
+  assert.equal(env.MERCADOPAGO_ACCESS_TOKEN, 'APP_USR-ficticio');
+  assert.equal(env.PAYMENT_PROVIDER, 'mercadopago');
+  const segredo = env.ADMIN_SECRET;
+
+  const lido = lerConfiguracao(dir);
+  assert.equal(lido.temToken, true);
+  assert.equal(JSON.stringify(lido).includes('APP_USR-ficticio'), false, 'o token não vai para a tela');
+
+  // Ajuste manual do dono continua; token em branco mantém o antigo; o segredo nunca muda.
+  fs.appendFileSync(path.join(dir, '.env'), "PLAYER=vlc\nTELEGRAM_BOT_TOKEN=abc\n");
+  salvarConfiguracao(dir, { modo: 'producao', senha: "outra senha com ' e `", porta: 3100, token: '' });
+  ({ env } = readSettings(dir, {}));
+  assert.equal(env.PLAYER, 'vlc');
+  assert.equal(env.TELEGRAM_BOT_TOKEN, 'abc');
+  assert.equal(env.MERCADOPAGO_ACCESS_TOKEN, 'APP_USR-ficticio');
+  assert.equal(env.ADMIN_SECRET, segredo);
+  assert.equal(env.ADMIN_PASSWORD, "outra senha com ' e `");
+
+  // Trocar de modo ajusta rede, provedor e player juntos.
+  salvarConfiguracao(dir, { modo: 'teste', senha: 'senha-bem-forte', porta: 3100 });
+  ({ env, test } = readSettings(dir, {}));
+  assert.equal(test, true);
+  assert.equal(env.PLAYER, 'sim');
+  assert.equal(env.PAYMENT_PROVIDER, 'mock');
+  assert.throws(() => salvarConfiguracao(dir, { modo: 'teste', senha: 'quebra\nde linha!!', porta: 3100 }), /quebra de linha/);
+  assert.equal(readSettings(dir, {}).env.ADMIN_PASSWORD, 'senha-bem-forte', 'erro não estraga o arquivo');
+});
+
+test('atualizarEnv troca só as chaves pedidas e remove repetidas que valeriam por cima', () => {
+  const texto = '# comentário\nA=1\nB=2\nA=3\n';
+  assert.equal(atualizarEnv(texto, { A: 'novo', C: 'x y' }), "# comentário\nA=novo\nB=2\nC='x y'\n");
+});
+
+test('ferramentas do instalador viram caminhos, mas o .env do dono vale mais', (t) => {
+  const dir = directory(t);
+  const pasta = path.join(dir, 'pacote');
+  const dados = path.join(dir, 'dados');
+  fs.mkdirSync(path.join(pasta, 'mpv'), { recursive: true });
+  for (const nome of ['mpv/mpv', 'ffmpeg', 'yt-dlp']) fs.writeFileSync(path.join(pasta, nome), 'x');
+  const achadas = ferramentasEmbutidas(pasta, dados, 'linux');
+  assert.equal(achadas.MPV_PATH, path.join(pasta, 'mpv', 'mpv'));
+  assert.equal(achadas.FFMPEG_PATH, path.join(pasta, 'ffmpeg'));
+  // O yt-dlp roda de uma cópia na pasta de dados, para conseguir se atualizar.
+  assert.equal(achadas.YTDLP_PATH, path.join(dados, 'ferramentas', 'yt-dlp'));
+  assert.ok(fs.existsSync(achadas.YTDLP_PATH));
+  fs.writeFileSync(achadas.YTDLP_PATH, 'atualizado pelo -U');
+  ferramentasEmbutidas(pasta, dados, 'linux');
+  assert.equal(fs.readFileSync(achadas.YTDLP_PATH, 'utf8'), 'atualizado pelo -U', 'não desfaz a atualização');
+  assert.deepEqual(ferramentasEmbutidas(path.join(dir, 'vazio'), dados, 'linux'), {});
+
+  createSettings(dados, 'teste');
+  fs.appendFileSync(path.join(dados, '.env'), 'FFMPEG_PATH=/meu/ffmpeg\nMPV_PATH=\n');
+  const { env } = readSettings(dados, {}, achadas);
+  assert.equal(env.FFMPEG_PATH, '/meu/ffmpeg');
+  assert.equal(env.MPV_PATH, achadas.MPV_PATH);
+  assert.equal(env.YTDLP_PATH, achadas.YTDLP_PATH);
 });
