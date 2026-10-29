@@ -8,7 +8,7 @@ export default function Categorias() {
 
   return (
     <>
-      <h1>Categorias</h1>
+      <h1>Gêneros</h1>
       <GradeCategorias categorias={dados.categorias} />
     </>
   );

@@ -75,7 +75,7 @@ export default function Regras({ chamar }) {
       });
       setRegras(salvo);
       setForm(paraFormulario(salvo));
-      setMensagem({ tipo: 'ok', texto: '✔ Regras salvas. Os celulares já foram atualizados.' });
+      setMensagem({ tipo: 'ok', texto: '✔ Regras salvas. A tela do jukebox já foi atualizada.' });
     } catch (erro) {
       setMensagem({ tipo: 'erro', texto: erro.message });
     } finally {
@@ -120,7 +120,7 @@ export default function Regras({ chamar }) {
           <span className="interruptor-trilho" aria-hidden="true" />
           <span>
             <strong>Abrir e fechar as vendas sozinho</strong>
-            <small>Fora do horário ninguém gera Pix novo, e os celulares atualizam na virada. Pode passar da meia-noite (ex.: 20:00 às 05:00).</small>
+            <small>Fora do horário ninguém gera Pix novo, e a tela atualiza na virada. Pode passar da meia-noite (ex.: 20:00 às 05:00).</small>
           </span>
         </label>
         <div className="admin-form-linha">
@@ -129,7 +129,7 @@ export default function Regras({ chamar }) {
         </div>
 
         <h2>📣 Mural</h2>
-        <label>Aviso (aparece no app e no monitor; deixe vazio para ocultar)
+        <label>Aviso (aparece na tela do jukebox e no telão; deixe vazio para ocultar)
           <input className="campo" maxLength={LIMITE_AVISO} placeholder="Ex.: Happy hour até 23h!" value={form.aviso}
             onChange={(e) => setForm({ ...form, aviso: e.target.value })} />
           <small>{form.aviso.length}/{LIMITE_AVISO}</small>

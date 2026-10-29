@@ -6,6 +6,7 @@ const dotenv = require('dotenv');
 const { lerConfiguracao, salvarConfiguracao, externalURL } = require('./settings.cjs');
 const { situacaoFerramentas } = require('./ferramentas.cjs');
 
+const CANAIS = ['config:ler', 'config:salvar', 'config:testar-token', 'config:maquininhas', 'config:ativar-pdv', 'config:portas', 'config:copiar', 'config:link', 'config:cancelar'];
 const pagina = pathToFileURL(path.join(__dirname, 'configurar.html')).href;
 
 // Confere o token na API do Mercado Pago, sem gravar nada. Token de teste ("TEST-") não cobra Pix de verdade.
@@ -23,6 +24,56 @@ async function testarToken(token) {
     return { ok: true, mensagem: `Token válido: conta ${nome}.` };
   } catch {
     return { ok: false, mensagem: 'Sem resposta do Mercado Pago. Confira a internet deste computador.' };
+  }
+}
+
+// Token digitado agora ou, em branco, o que já está no .env.
+function tokenOuSalvo(token, dataDir) {
+  if (token) return token;
+  const arquivo = path.join(dataDir, '.env');
+  return fs.existsSync(arquivo) ? dotenv.parse(fs.readFileSync(arquivo)).MERCADOPAGO_ACCESS_TOKEN?.trim() || '' : '';
+}
+
+async function chamarMercadoPago(token, rota, opcoes = {}) {
+  const resposta = await fetch(`https://api.mercadopago.com${rota}`, {
+    ...opcoes,
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    signal: AbortSignal.timeout(10000),
+  });
+  if (!resposta.ok) throw new Error(resposta.status === 401 ? 'O Mercado Pago recusou o token.' : `O Mercado Pago respondeu com erro (${resposta.status}).`);
+  return resposta.json();
+}
+
+// Maquininhas Point ligadas à conta. Só as que estão em modo PDV recebem cobranças do jukebox.
+async function listarMaquininhas(token) {
+  if (!token) return { ok: false, mensagem: 'Cole o Access Token primeiro.' };
+  try {
+    const dados = await chamarMercadoPago(token, '/terminals/v1/list?limit=50');
+    const terminais = (dados.data?.terminals ?? []).map((t) => ({ id: t.id, modo: t.operating_mode }));
+    if (!terminais.length) return { ok: false, mensagem: 'Nenhuma maquininha Point nesta conta. Vincule a maquininha no app do Mercado Pago.' };
+    return { ok: true, terminais };
+  } catch (e) {
+    return { ok: false, mensagem: e.message || 'Sem resposta do Mercado Pago.' };
+  }
+}
+
+async function ativarPdv(token, id) {
+  try {
+    await chamarMercadoPago(token, '/terminals/v1/setup', { method: 'PATCH', body: JSON.stringify({ terminals: [{ id, operating_mode: 'PDV' }] }) });
+    return { ok: true, mensagem: 'Modo PDV ativado. Reinicie a maquininha para valer.' };
+  } catch (e) {
+    return { ok: false, mensagem: e.message };
+  }
+}
+
+// Portas seriais deste computador, para escolher onde está a placa do noteiro.
+async function listarPortas() {
+  try {
+    const { SerialPort } = require('serialport');
+    const portas = await SerialPort.list();
+    return portas.map((p) => ({ caminho: p.path, nome: [p.manufacturer, p.friendlyName].filter(Boolean).join(' · ') }));
+  } catch {
+    return [];
   }
 }
 
@@ -72,11 +123,14 @@ function abrirConfiguracao({ dataDir, ferramentas, erro }) {
       }
     });
     tratar('config:testar-token', (token) => testarToken(String(token || '').trim()));
+    tratar('config:maquininhas', (token) => listarMaquininhas(tokenOuSalvo(String(token || '').trim(), dataDir)));
+    tratar('config:ativar-pdv', (token, id) => ativarPdv(tokenOuSalvo(String(token || '').trim(), dataDir), String(id || '')));
+    tratar('config:portas', listarPortas);
     tratar('config:copiar', (texto) => clipboard.writeText(String(texto || '')));
     tratar('config:link', (url) => { if (externalURL(url)) shell.openExternal(url).catch(() => {}); });
     tratar('config:cancelar', () => janela.close());
     janela.on('closed', () => {
-      for (const canal of ['config:ler', 'config:salvar', 'config:testar-token', 'config:copiar', 'config:link', 'config:cancelar']) ipcMain.removeHandler(canal);
+      for (const canal of CANAIS) ipcMain.removeHandler(canal);
       aberta = null;
       resolve(resultado);
     });

@@ -10,7 +10,7 @@ export async function api(caminho, { metodo = 'GET', corpo, token } = {}) {
       body: !corpo ? undefined : corpo instanceof FormData ? corpo : JSON.stringify(corpo),
     });
   } catch {
-    throw Object.assign(new Error('Sem conexão com a jukebox. Confira o WiFi.'), { status: 0 });
+    throw Object.assign(new Error('Sem conexão com o servidor do jukebox. Tentando de novo…'), { status: 0 });
   }
 
   const dados = await resposta.json().catch(() => ({}));
@@ -25,13 +25,9 @@ export async function api(caminho, { metodo = 'GET', corpo, token } = {}) {
 
 export const capaUrl = (capa) => (capa ? `/capas/${capa}` : null);
 
-// No telão o pagamento abre por cima da tela. No celular, vai para a página de Pix.
-export function irParaPagamento(navigate) {
-  if (typeof window !== 'undefined' && window.location.pathname === '/tela') {
-    window.dispatchEvent(new Event('jukebox:pagar'));
-    return;
-  }
-  navigate('/pagar');
+// Abre a janela "Colocar créditos" por cima de qualquer tela do jukebox.
+export function abrirCreditos() {
+  window.dispatchEvent(new Event('jukebox:pagar'));
 }
 
 export function formatarDuracao(segundos) {

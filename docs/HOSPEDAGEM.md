@@ -1,6 +1,9 @@
 # Hospedando na internet
 
-A jukebox toca o áudio **onde o player (mpv/VLC) roda**. Por isso há dois cenários:
+A jukebox toca o áudio **onde o player (mpv/VLC) roda**, e o cliente escolhe e paga **só na tela do jukebox**: por padrão
+o servidor recusa quem chega pela rede ou por túnel/proxy (só o webhook do Mercado Pago passa). Os cenários abaixo só
+servem para o webhook ou, com `ACESSO_REDE=1` no `.env`, para abrir o painel e as telas de fora (por sua conta: quem
+tiver o endereço alcança também a tela do jukebox e o saldo dela).
 
 ## 1. Notebook da boate + túnel (recomendado para uso real)
 O servidor continua no notebook (o som sai nas caixas) e é exposto com HTTPS por um túnel, para o cliente acessar mesmo fora do WiFi e o Mercado Pago enviar webhooks:

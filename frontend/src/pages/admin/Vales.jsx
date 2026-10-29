@@ -4,7 +4,7 @@ import { api } from '../../api.js';
 const dataBr = (iso) => new Date(iso).toLocaleDateString('pt-BR');
 const dataHora = (iso) => new Date(iso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
 
-// Vale-música: cartões com QR code e código que o garçom entrega (ex.: "1 drink, 1 música").
+// Vale-música: cartões com um código que o garçom entrega (ex.: "1 drink, 1 música").
 export default function Vales({ chamar }) {
   const [nomeLocal, setNomeLocal] = useState('Jukebox');
   const [lotes, setLotes] = useState(null);
@@ -71,7 +71,7 @@ export default function Vales({ chamar }) {
       <div className="so-tela">
         <h2>🎟 Vales-música</h2>
         <p className="nota">
-          Cartões com QR code e código, para o garçom entregar junto com um drink, por exemplo. O cliente aponta a câmera (ou digita o código no app)
+          Cartões com um código, para o garçom entregar junto com um drink, por exemplo. O cliente digita o código na tela do jukebox
           e ganha músicas grátis. Cada código vale <b>uma vez</b>. São créditos de <b>cortesia</b>: <b>o custo é seu</b> e não entram no faturamento nem na divisão com a boate.
         </p>
 
@@ -137,9 +137,9 @@ export default function Vales({ chamar }) {
                 <strong className="vale-cartao-casa">🎵 {nomeLocal}</strong>
                 <span className="vale-cartao-titulo">VALE-MÚSICA</span>
                 <b className="vale-cartao-valor">{c.creditos} {c.creditos === 1 ? 'música grátis' : 'músicas grátis'}</b>
-                <img src={c.qr} alt={`QR code do vale ${c.codigo}`} />
+
                 <code className="vale-cartao-codigo">{c.codigo}</code>
-                <small>Aponte a câmera do celular para o QR code ou digite o código no app (Início → “Tenho um vale-música”). Vale até {dataBr(c.validade_em)}. Uso único.</small>
+                <small>Digite o código na tela do jukebox (Colocar créditos → “Tenho um vale-música”). Vale até {dataBr(c.validade_em)}. Uso único.</small>
               </div>
             ))}
           </div>

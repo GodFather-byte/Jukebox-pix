@@ -50,10 +50,55 @@ function desenharFerramentas() {
     : item('opcional', 'yt-dlp: não encontrado (opcional)', 'Sem ele o cliente só escolhe músicas do acervo.'));
 }
 
+// Garante que o valor salvo apareça na lista mesmo antes de "Procurar".
+function opcao(select, valor, texto) {
+  if (!valor || [...select.options].some((o) => o.value === valor)) return;
+  select.add(new Option(texto || valor, valor));
+}
+
+async function procurarMaquininhas() {
+  const botao = $('procurar-maquininhas');
+  botao.disabled = true;
+  mostrarAviso($('maquininha-resultado'), 'Procurando maquininhas na sua conta...', 'alerta');
+  try {
+    const r = await window.jukebox.maquininhas($('token').value.trim());
+    if (!r.ok) return mostrarAviso($('maquininha-resultado'), r.mensagem, 'erro');
+    for (const t of r.terminais) opcao($('terminal'), t.id, `${t.id}${t.modo === 'PDV' ? '' : ' (precisa ativar o modo PDV)'}`);
+    if (!$('terminal').value) $('terminal').value = r.terminais[0].id;
+    dados.terminais = r.terminais;
+    mostrarAviso($('maquininha-resultado'), `${r.terminais.length === 1 ? 'Achei 1 maquininha' : `Achei ${r.terminais.length} maquininhas`}.`);
+    conferirPdv();
+  } finally {
+    botao.disabled = false;
+  }
+}
+
+function conferirPdv() {
+  const escolhida = (dados.terminais || []).find((t) => t.id === $('terminal').value);
+  $('ativar-pdv').hidden = !escolhida || escolhida.modo === 'PDV';
+}
+
+async function ativarPdv() {
+  const r = await window.jukebox.ativarPdv($('token').value.trim(), $('terminal').value);
+  mostrarAviso($('maquininha-resultado'), r.mensagem, r.ok ? '' : 'erro');
+  if (r.ok) {
+    const t = dados.terminais.find((x) => x.id === $('terminal').value);
+    if (t) t.modo = 'PDV';
+    conferirPdv();
+  }
+}
+
+async function procurarPortas() {
+  const portas = await window.jukebox.portas();
+  for (const p of portas) opcao($('noteiro'), p.caminho, p.nome ? `${p.caminho} · ${p.nome}` : p.caminho);
+  if (!portas.length) mostrarAviso($('erro'), 'Nenhuma porta serial encontrada. Confira o cabo USB da placa do noteiro.', 'alerta');
+}
+
 function atualizarModo() {
   const producao = modo() === 'producao';
   $('secao-pix').hidden = !producao;
-  $('titulo-ferramentas').textContent = `${producao ? 4 : 3}. Som e ferramentas`;
+  $('titulo-noteiro').textContent = `${producao ? 4 : 3}. Noteiro (dinheiro)`;
+  $('titulo-ferramentas').textContent = `${producao ? 5 : 4}. Som e ferramentas`;
   $('salvar').textContent = dados.existe ? 'Salvar e reiniciar' : 'Salvar e abrir';
   desenharFerramentas();
 }
@@ -81,6 +126,8 @@ async function salvar(evento) {
       nomeLocal: $('nomeLocal').value,
       senha: $('senha').value,
       token: $('token').value,
+      terminal: modo() === 'producao' ? $('terminal').value : '',
+      noteiroPorta: $('noteiro').value,
       porta: Number($('porta').value),
     });
     if (!r.ok) mostrarAviso($('erro'), r.erro, 'erro');
@@ -95,6 +142,10 @@ async function iniciar() {
   $('nomeLocal').value = dados.nomeLocal;
   $('senha').value = dados.senha;
   $('porta').value = dados.porta;
+  opcao($('terminal'), dados.terminal);
+  $('terminal').value = dados.terminal;
+  opcao($('noteiro'), dados.noteiroPorta);
+  $('noteiro').value = dados.noteiroPorta;
   if (dados.temToken) $('token').placeholder = 'Já preenchido. Deixe em branco para manter.';
   if (dados.existe) $('subtitulo').textContent = 'As mudanças valem assim que o jukebox reiniciar.';
   if (dados.erro) mostrarAviso($('erro-inicial'), dados.erro, 'erro');
@@ -109,6 +160,10 @@ async function iniciar() {
     $('mostrar-token').textContent = campo.type === 'password' ? 'Mostrar' : 'Esconder';
   });
   $('testar').addEventListener('click', testar);
+  $('procurar-maquininhas').addEventListener('click', procurarMaquininhas);
+  $('terminal').addEventListener('change', conferirPdv);
+  $('ativar-pdv').addEventListener('click', ativarPdv);
+  $('procurar-portas').addEventListener('click', procurarPortas);
   $('cancelar').addEventListener('click', () => window.jukebox.cancelar());
   $('form').addEventListener('submit', salvar);
   for (const link of document.querySelectorAll('[data-link]')) {

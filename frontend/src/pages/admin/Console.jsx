@@ -74,7 +74,7 @@ export default function Console({ chamar }) {
               <div className="admin-linha-info">
                 <strong>{m.titulo}</strong>
                 <span>{m.artista} · {m.cd} · <span className="mono">{formatarDuracao(m.duracao)}</span> · {m.vezes_tocada}x tocada</span>
-                {escondida && <span className="selo selo-rosa">🙈 {m.cd_oculto ? 'CD oculto' : 'Oculta'} no app</span>}
+                {escondida && <span className="selo selo-rosa">🙈 {m.cd_oculto ? 'CD oculto' : 'Oculta'} no jukebox</span>}
               </div>
               <div className="admin-acoes">
                 <label className="console-preco" title="Créditos cobrados por esta música">

@@ -21,11 +21,11 @@
       <div class="modos">
         <label class="modo">
           <input type="radio" name="modo" value="producao">
-          <span><strong>Atender clientes</strong><small>Pix de verdade pelo Mercado Pago e som real. Os celulares da rede Wi-Fi acessam.</small></span>
+          <span><strong>Atender clientes</strong><small>Cobrança de verdade (Pix, cartão e dinheiro) e som real, tudo na tela do jukebox.</small></span>
         </label>
         <label class="modo">
           <input type="radio" name="modo" value="teste">
-          <span><strong>Só experimentar</strong><small>Créditos grátis, sem cobrança e sem som. Só funciona neste computador.</small></span>
+          <span><strong>Só experimentar</strong><small>Créditos grátis, sem cobrança e sem som. Pix, cartão e notas são simulados.</small></span>
         </label>
       </div>
     </section>
@@ -46,7 +46,7 @@
     </section>
 
     <section id="secao-pix">
-      <h2>3. Pix (Mercado Pago)</h2>
+      <h2 id="titulo-pix">3. Pix e cartão (Mercado Pago)</h2>
       <label class="campo">Access Token de produção
         <span class="linha">
           <input id="token" type="password" spellcheck="false" placeholder="APP_USR-...">
@@ -57,6 +57,27 @@
           <a href="#" data-link="https://www.mercadopago.com.br/developers/panel/app">Abrir o painel de credenciais</a></small>
       </label>
       <div id="token-resultado" class="aviso" hidden></div>
+
+      <label class="campo">Maquininha de cartão (Mercado Pago Point) — débito e crédito
+        <span class="linha">
+          <select id="terminal"><option value="">Sem maquininha</option></select>
+          <button type="button" id="procurar-maquininhas" class="secundario">Procurar</button>
+        </span>
+        <small>Ligue a maquininha e vincule-a à mesma conta do token. Ela precisa estar em modo PDV.</small>
+      </label>
+      <div id="maquininha-resultado" class="aviso" hidden></div>
+      <button type="button" id="ativar-pdv" class="secundario" hidden>Ativar modo PDV nesta maquininha</button>
+    </section>
+
+    <section>
+      <h2 id="titulo-noteiro">Noteiro (dinheiro)</h2>
+      <label class="campo">Porta da placa do noteiro
+        <span class="linha">
+          <select id="noteiro"><option value="">Sem noteiro</option></select>
+          <button type="button" id="procurar-portas" class="secundario">Procurar</button>
+        </span>
+        <small>A placa (Arduino ou interface do noteiro) ligada na USB aparece como COM3, COM4… no Windows ou /dev/ttyUSB0 no Linux.</small>
+      </label>
     </section>
 
     <section>

@@ -53,7 +53,11 @@ export function montarTexto(resumo, periodo, { para = 'dono', top = [] } = {}) {
 
   linhas.push(`👤 Sua parte (${pct}%): ${reais(resumo.usuario)}`);
   linhas.push(`🏠 Parte da boate (${100 - pct}%): ${reais(resumo.boate)}`);
-  linhas.push(`📲 Pix recebido: ${reais(resumo.arrecadado)} (${plural(resumo.pagamentos, 'pagamento', 'pagamentos')}${resumo.pagamentos ? `, ticket médio ${reais(resumo.ticket_medio)}` : ''})`);
+  linhas.push(`💵 Recebido: ${reais(resumo.arrecadado)} (${plural(resumo.pagamentos, 'pagamento', 'pagamentos')}${resumo.pagamentos ? `, ticket médio ${reais(resumo.ticket_medio)}` : ''})`);
+  if (resumo.por_metodo) {
+    const { pix, cartao, nota } = resumo.por_metodo;
+    linhas.push(`   Pix ${reais(pix)} · Cartão ${reais(cartao)} · Notas ${reais(nota)}`);
+  }
   if (resumo.vales > 0) linhas.push(`🎟 ${plural(resumo.vales, 'vale resgatado', 'vales resgatados')} (${resumo.vales_creditos} créditos de cortesia)`);
   if (top.length) {
     linhas.push('', '🏆 Mais tocadas:');

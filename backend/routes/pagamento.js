@@ -10,6 +10,8 @@ router.post('/iniciar', async (req, res) => {
   const pagamento = await iniciar({
     valor: Number(req.body?.valor),
     sessionId: req.body?.session_id,
+    metodo: req.body?.metodo,
+    tipoCartao: req.body?.tipo_cartao,
   });
   res.status(201).json({ ...pagamento, pagamento_id: pagamento.id });
 });

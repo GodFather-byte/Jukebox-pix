@@ -24,7 +24,8 @@ test('readiness do desktop usa o mesmo elemento de montagem do frontend', () => 
   assert.ok(desktop.includes('document.querySelector("#raiz")?.children.length'));
   assert.match(desktop, /fetch\(`\$\{origin\}\/tela`/);
   assert.match(desktop, /mainWindow = windowFor\(`\$\{origin\}\/tela`/);
-  assert.ok(desktop.includes('Catálogo do cliente'));
+  assert.ok(desktop.includes('Abrir telão'));
+  assert.ok(!desktop.includes('Catálogo do cliente'), 'o cliente não usa mais o celular');
   assert.ok(desktop.includes('Painel administrativo'));
 });
 
@@ -65,7 +66,7 @@ test('produção incompleta ou insegura não inicia, e caminhos do operador são
   fs.appendFileSync(file, '\nMERCADOPAGO_ACCESS_TOKEN=valor-ficticio-para-teste\nMUSICAS_DIR=/acervo-do-operador\n');
   const { env } = readSettings(dir, {});
   assert.equal(env.NODE_ENV, 'production');
-  assert.equal(env.HOST, '0.0.0.0');
+  assert.equal(env.HOST, '127.0.0.1', 'só a tela do jukebox acessa o servidor');
   assert.equal(env.MUSICAS_DIR, '/acervo-do-operador');
   fs.appendFileSync(file, '\nADMIN_PASSWORD=admin\n');
   assert.throws(() => readSettings(dir, {}), /12 caracteres/);
@@ -167,4 +168,19 @@ test('ferramentas do instalador viram caminhos, mas o .env do dono vale mais', (
   assert.equal(env.FFMPEG_PATH, '/meu/ffmpeg');
   assert.equal(env.MPV_PATH, achadas.MPV_PATH);
   assert.equal(env.YTDLP_PATH, achadas.YTDLP_PATH);
+});
+
+test('maquininha e noteiro escolhidos na tela vão para o .env, e vazio desliga', (t) => {
+  const dir = directory(t);
+  salvarConfiguracao(dir, { modo: 'producao', senha: 'senha-bem-forte', porta: 3000, token: 'APP_USR-x', terminal: 'NEWLAND_N950__N950NCB801', noteiroPorta: 'COM3' });
+  let { env } = readSettings(dir, {});
+  assert.equal(env.MERCADOPAGO_POINT_TERMINAL, 'NEWLAND_N950__N950NCB801');
+  assert.equal(env.NOTEIRO, 'serial');
+  assert.equal(env.NOTEIRO_PORTA, 'COM3');
+  assert.deepEqual([lerConfiguracao(dir).terminal, lerConfiguracao(dir).noteiroPorta], ['NEWLAND_N950__N950NCB801', 'COM3']);
+  salvarConfiguracao(dir, { modo: 'producao', senha: 'senha-bem-forte', porta: 3000 });
+  ({ env } = readSettings(dir, {}));
+  assert.equal(env.NOTEIRO, 'desligado');
+  assert.equal(env.MERCADOPAGO_POINT_TERMINAL, '');
+  assert.throws(() => salvarConfiguracao(dir, { modo: 'producao', senha: 'senha-bem-forte', porta: 3000, terminal: 'com espaço' }), /Maquininha/);
 });

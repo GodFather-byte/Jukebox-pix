@@ -1,17 +1,11 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { api } from '../api.js';
 
-export const CHAVE_SESSAO = 'jukebox_sessao';
 const SessaoContext = createContext(null);
 
 export const useSessao = () => useContext(SessaoContext);
 
-const lerArmazenado = () => {
-  try { return localStorage.getItem(CHAVE_SESSAO); } catch { return null; }
-};
-const gravarArmazenado = (id) => {
-  try { localStorage.setItem(CHAVE_SESSAO, id); } catch { /* modo privado: a sessão dura só esta aba */ }
-};
+const METODOS_PADRAO = { pix: true, cartao: false, nota: false };
 
 const FILA_VAZIA = { agora_tocando: null, fila: [], total_aguardando: 0 };
 
@@ -41,26 +35,20 @@ export function SessaoProvider({ children }) {
   // Músicas da internet que esta pessoa pediu e que ainda estão sendo baixadas (ainda não entraram na fila).
   const [preparando, setPreparando] = useState([]);
   const [conectado, setConectado] = useState(true);
+  // Formas de pagamento deste jukebox (Pix sempre; cartão e notas quando a maquininha e o noteiro existem).
+  const [quiosque, setQuiosque] = useState({ metodos: METODOS_PADRAO, modo_teste: false });
 
+  // O jukebox é um aparelho só: a sessão (e o saldo) é a do quiosque, a mesma para quem chegar na tela.
   useEffect(() => {
     let ativo = true;
-    (async () => {
-      const id = lerArmazenado();
-      let atual = null;
-      if (id) {
-        try {
-          atual = await api(`/sessoes/${id}`);
-        } catch (erro) {
-          if (erro.status !== 404) throw erro;
-        }
-      }
-      atual ??= await api('/sessoes', { metodo: 'POST' });
-      gravarArmazenado(atual.id);
-      if (ativo) {
-        setSessao(atual);
+    api('/quiosque')
+      .then((q) => {
+        if (!ativo) return;
+        setSessao(q.sessao);
+        setQuiosque({ metodos: q.metodos, modo_teste: q.modo_teste });
         setErroConexao(null);
-      }
-    })().catch((erro) => ativo && setErroConexao(erro.message));
+      })
+      .catch((erro) => ativo && setErroConexao(erro.message));
     return () => {
       ativo = false;
     };
@@ -77,7 +65,8 @@ export function SessaoProvider({ children }) {
 
   useEffect(() => {
     if (!sessionId) return undefined;
-    const eventos = new EventSource(`/api/eventos?session_id=${sessionId}`);
+    // tela=1: esta tela conta como telão ligado (recados pagos podem ir ao ar).
+    const eventos = new EventSource(`/api/eventos?session_id=${sessionId}&tela=1`);
     let ativo = true;
     let avisoQueda;
 
@@ -148,6 +137,7 @@ export function SessaoProvider({ children }) {
     fila,
     versoes,
     config,
+    quiosque,
     erroConexao,
     preparando,
     conectado,
@@ -155,7 +145,7 @@ export function SessaoProvider({ children }) {
     adicionarMusica,
     tentarNovamente: () => setTentativa((n) => n + 1),
     atualizarSessao: (dados) => setSessao((s) => ({ ...s, ...dados })),
-  }), [sessao, fila, versoes, config, erroConexao, preparando, conectado, recarregarPreparando, adicionarMusica]);
+  }), [sessao, fila, versoes, config, quiosque, erroConexao, preparando, conectado, recarregarPreparando, adicionarMusica]);
 
   return <SessaoContext.Provider value={valor}>{children}</SessaoContext.Provider>;
 }

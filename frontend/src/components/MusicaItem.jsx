@@ -1,30 +1,21 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import Capa from './Capa.jsx';
 import Destaque from './Destaque.jsx';
-import { formatarDuracao, irParaPagamento } from '../api.js';
+import { abrirCreditos, formatarDuracao } from '../api.js';
 import { useSessao } from '../context/Sessao.jsx';
 import { useToast } from '../context/Toast.jsx';
-import { useFavoritos } from '../favoritos.js';
 
 // `posicao` mostra a medalha do ranking (🥇🥈🥉 e depois o número).
 const MEDALHAS = ['🥇', '🥈', '🥉'];
 
-function vibrar() {
-  try { navigator.vibrate?.(40); } catch { /* aparelho sem vibração */ }
-}
-
 export default function MusicaItem({ musica, posicao, numero, mostrarCapa = true, termo, aoPedir }) {
   const { adicionarMusica, config, fila } = useSessao();
-  const { tem, alternar } = useFavoritos();
   const mostrarToast = useToast();
-  const navigate = useNavigate();
   const [estado, setEstado] = useState('ocioso'); // ocioso | enviando | ok
 
   const extra = config.prioridade.extra;
   const preco = musica.creditos ?? 1; // já vem com o preço de lançamento, se houver
   const custoPrioridade = preco + extra;
-  const favorita = tem(musica.id);
   const naFila = fila.fila.some((item) => item.musica.id === musica.id) || fila.agora_tocando?.musica.id === musica.id;
   const linhaArtista = musica.artista ? `${musica.artista}${musica.cd ? ` · ${musica.cd}` : ''}` : '';
 
@@ -36,7 +27,6 @@ export default function MusicaItem({ musica, posicao, numero, mostrarCapa = true
     try {
       await adicionarMusica(musica, { prioridade });
       aoPedir?.();
-      vibrar();
       mostrarToast(prioridade ? `⚡ "${musica.titulo}" vai tocar a seguir!` : `"${musica.titulo}" entrou na fila 🎶`, { tipo: 'ok' });
       setEstado('ok');
       setTimeout(() => setEstado('ocioso'), 1800);
@@ -44,7 +34,7 @@ export default function MusicaItem({ musica, posicao, numero, mostrarCapa = true
       setEstado('ocioso');
       mostrarToast(erro.message, {
         tipo: 'erro',
-        acao: erro.codigo === 'SALDO_INSUFICIENTE' ? { texto: 'PAGAR', aoClicar: () => irParaPagamento(navigate) } : undefined,
+        acao: erro.codigo === 'SALDO_INSUFICIENTE' ? { texto: 'PAGAR', aoClicar: abrirCreditos } : undefined,
       });
     }
   }
@@ -73,21 +63,12 @@ export default function MusicaItem({ musica, posicao, numero, mostrarCapa = true
       </div>
       <button
         type="button"
-        className={`btn-coracao ${favorita ? 'ativo' : ''}`}
-        aria-pressed={favorita}
-        aria-label={favorita ? `Remover ${musica.titulo} das favoritas` : `Salvar ${musica.titulo} nas favoritas`}
-        onClick={() => alternar(musica.id)}
-      >
-        {favorita ? '♥' : '♡'}
-      </button>
-      <button
-        type="button"
         className={`btn btn-add ${estado === 'ok' ? 'btn-ok' : ''}`}
         onClick={() => adicionar(false)}
         disabled={estado === 'enviando'}
         aria-label={`Adicionar ${musica.titulo} à fila${preco > 1 ? ` por ${preco} créditos` : ''}`}
       >
-        {estado === 'ok' ? '✔ NA FILA' : preco > 1 ? `+ ${preco} CRÉD.` : '+ ADICIONAR'}
+        {estado === 'ok' ? '✔ Na fila' : preco > 1 ? `+ ${preco} créditos` : '+ Tocar'}
       </button>
     </li>
   );

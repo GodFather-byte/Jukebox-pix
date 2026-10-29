@@ -28,7 +28,7 @@ function Configuracao({ chamar, config, aoSalvar }) {
         metodo: 'PUT',
         corpo: { ativo: form.ativo, preco: Number(form.preco), segundos: Number(form.segundos), moderacao: form.moderacao, bloqueadas: form.bloqueadas },
       });
-      setMensagem({ tipo: 'ok', texto: '✔ Ajustes salvos. Os celulares já foram atualizados.' });
+      setMensagem({ tipo: 'ok', texto: '✔ Ajustes salvos. A tela do jukebox já foi atualizada.' });
       aoSalvar();
     } catch (erro) {
       setMensagem({ tipo: 'erro', texto: erro.message });

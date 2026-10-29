@@ -664,7 +664,7 @@ router.get('/relatorio.csv', (req, res) => {
 // Recado que foi ao ar entra no faturamento como a música tocada.
 function resumoDesde(desdeIso) {
   const r = relatorio.resumoPeriodo(desdeIso, new Date(Date.now() + 60_000).toISOString());
-  return { tocadas: r.tocadas, bruto: r.bruto, usuario: r.usuario, boate: r.boate, arrecadado: r.arrecadado, cortesia: r.cortesia, recados: r.recados };
+  return { tocadas: r.tocadas, bruto: r.bruto, usuario: r.usuario, boate: r.boate, arrecadado: r.arrecadado, por_metodo: r.por_metodo, cortesia: r.cortesia, recados: r.recados };
 }
 
 const diaLocal = (data) => data.toLocaleDateString('sv-SE');

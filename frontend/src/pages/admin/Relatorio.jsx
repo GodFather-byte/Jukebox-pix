@@ -91,13 +91,13 @@ export default function Relatorio({ chamar, baixarArquivo }) {
           </div>
 
           <dl className="relatorio-extras">
-            <div><dt>Pix recebido no período</dt><dd className="mono">{formatarReais(t.arrecadado)}</dd></div>
+            <div><dt>Recebido no período (Pix, cartão e notas)</dt><dd className="mono">{formatarReais(t.arrecadado)}</dd></div>
             <div><dt>Pagamentos</dt><dd className="mono">{t.pagamentos}</dd></div>
             <div><dt>Ticket médio</dt><dd className="mono">{formatarReais(t.ticket_medio)}</dd></div>
             <div><dt>Horário de pico</dt><dd className="mono">{dados.horario_de_pico == null ? '—' : `${dados.horario_de_pico}h`}</dd></div>
             {t.vales > 0 && <div><dt>Vales resgatados</dt><dd className="mono">{t.vales} ({t.vales_creditos} créd.)</dd></div>}
           </dl>
-          <p className="nota">A divisão considera só as músicas pagas efetivamente tocadas e os recados que foram ao ar. Cortesia, vales e playlist automática ficam de fora (vales e bônus são custo seu), e “Pix recebido” inclui créditos ainda não usados ou vencidos.</p>
+          <p className="nota">A divisão considera só as músicas pagas efetivamente tocadas e os recados que foram ao ar. Cortesia, vales e playlist automática ficam de fora (vales e bônus são custo seu), e “Recebido” inclui créditos ainda não usados ou vencidos.</p>
 
           <div className="relatorio-acoes so-tela">
             <button className="btn btn-ciano" onClick={baixarCsv}>⬇ Baixar CSV (Excel)</button>
@@ -116,7 +116,7 @@ export default function Relatorio({ chamar, baixarArquivo }) {
           <div className="tabela-rolavel">
             <table className="tabela-relatorio">
               <thead>
-                <tr><th>Dia</th><th>Tocadas</th><th>Faturado</th><th>Sua parte</th><th>Boate</th><th>Pix recebido</th></tr>
+                <tr><th>Dia</th><th>Tocadas</th><th>Faturado</th><th>Sua parte</th><th>Boate</th><th>Recebido</th></tr>
               </thead>
               <tbody>
                 {dados.por_dia.map((d) => (

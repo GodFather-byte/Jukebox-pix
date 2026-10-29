@@ -1,0 +1,112 @@
+import assert from 'node:assert/strict';
+import { spawn, spawnSync } from 'node:child_process';
+import fs from 'node:fs';
+import net from 'node:net';
+import os from 'node:os';
+import path from 'node:path';
+import { randomUUID } from 'node:crypto';
+import { test } from 'node:test';
+import { fileURLToPath } from 'node:url';
+
+const raiz = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const ambiente = (extras) => ({
+  ...process.env, DOTENV_CONFIG_PATH: path.join(raiz, 'tests', '.env-inexistente'), DOTENV_CONFIG_QUIET: 'true',
+  NODE_ENV: 'test', PLAYER: 'sim', PAYMENT_PROVIDER: 'mock', PUBLIC_URL: '', ...extras,
+});
+const pastaDeDados = (t) => {
+  const pasta = path.join(raiz, 'tests', `.quiosque-${randomUUID()}`);
+  fs.mkdirSync(pasta, { recursive: true });
+  t.after(() => fs.rmSync(pasta, { recursive: true, force: true }));
+  return pasta;
+};
+
+async function portaLivre() {
+  const s = net.createServer();
+  await new Promise((r) => s.listen(0, '127.0.0.1', r));
+  const { port } = s.address();
+  await new Promise((r) => s.close(r));
+  return port;
+}
+
+async function servidor(t, extras = {}) {
+  const porta = await portaLivre();
+  const filho = spawn(process.execPath, ['backend/server.js'], {
+    cwd: raiz, env: ambiente({ JUKEBOX_DATA_DIR: pastaDeDados(t), HOST: '0.0.0.0', PORT: String(porta), ...extras }), stdio: 'ignore',
+  });
+  t.after(() => filho.kill('SIGKILL'));
+  const base = `http://127.0.0.1:${porta}`;
+  for (let i = 0; i < 150; i++) {
+    try { if ((await fetch(`${base}/healthz`)).ok) break; } catch { /* subindo */ }
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  const api = async (rota, corpo) => {
+    const r = await fetch(`${base}/api${rota}`, corpo === undefined ? {} : {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo),
+    });
+    return { status: r.status, dados: await r.json().catch(() => null) };
+  };
+  return { porta, api };
+}
+
+const ipDaRede = () => Object.values(os.networkInterfaces()).flat().find((e) => e?.family === 'IPv4' && !e.internal)?.address;
+
+test('jukebox: uma sessão só, nota e cartão creditam nela, e a rede fica de fora', { timeout: 30_000 }, async (t) => {
+  const { porta, api } = await servidor(t);
+  const { dados: q } = await api('/quiosque');
+  assert.deepEqual(q.metodos, { pix: true, cartao: true, nota: true });
+  const sessao = q.sessao.id;
+  assert.equal((await api('/quiosque')).dados.sessao.id, sessao, 'sempre a mesma sessão');
+
+  assert.equal((await api('/quiosque/nota-teste', { valor: 10 })).status, 201);
+  assert.equal((await api(`/sessoes/${sessao}`)).dados.saldo, 10);
+  assert.equal((await api('/quiosque/nota-teste', { valor: 0 })).status, 400);
+
+  const cartao = (await api('/pagamento/iniciar', { valor: 5, session_id: sessao, metodo: 'cartao', tipo_cartao: 'debito' })).dados;
+  assert.equal(cartao.metodo, 'cartao');
+  assert.equal(cartao.qr_imagem, null);
+  // Outro cartão tira o anterior da maquininha.
+  const outro = (await api('/pagamento/iniciar', { valor: 20, session_id: sessao, metodo: 'cartao' })).dados;
+  assert.equal((await api(`/pagamento/${cartao.id}`)).dados.status, 'falho');
+  await api(`/pagamento/mock/confirmar/${outro.id}`, {});
+  assert.equal((await api(`/sessoes/${sessao}`)).dados.saldo, 30);
+
+  const pix = (await api('/pagamento/iniciar', { valor: 5, session_id: sessao })).dados;
+  assert.equal(pix.metodo, 'pix');
+  assert.ok(pix.qr_imagem.startsWith('data:image/png'));
+  assert.equal((await api('/pagamento/iniciar', { valor: 5, session_id: sessao, metodo: 'boleto' })).status, 400);
+
+  const tunel = await fetch(`http://127.0.0.1:${porta}/api/quiosque`, { headers: { 'X-Forwarded-For': '203.0.113.9' } });
+  assert.equal(tunel.status, 403, 'quem chega por túnel/proxy não é a tela do jukebox');
+
+  const ip = ipDaRede();
+  if (ip) {
+    const r = await fetch(`http://${ip}:${porta}/api/quiosque`);
+    assert.equal(r.status, 403, 'celular na rede não acessa');
+    assert.equal((await fetch(`http://${ip}:${porta}/healthz`)).status, 200);
+  }
+});
+
+test('noteiro: pulsos seguidos viram uma nota, linha com valor é a nota, lixo é ignorado', { timeout: 20_000 }, (t) => {
+  const codigo = `
+    const { lerLinha } = await import('./backend/services/noteiro.js');
+    const { sessaoDoQuiosque } = await import('./backend/services/quiosque.js');
+    const { db } = await import('./backend/database.js');
+    for (let i = 0; i < 5; i++) lerLinha('P');
+    await new Promise((r) => setTimeout(r, 900));
+    const depoisPulsos = sessaoDoQuiosque().saldo;
+    lerLinha('20\\r');
+    lerLinha('NOTEIRO OK');
+    lerLinha('9999');
+    const metodos = db.prepare("SELECT metodo, valor FROM pagamentos ORDER BY criado_em").all();
+    console.log(JSON.stringify({ depoisPulsos, final: sessaoDoQuiosque().saldo, metodos }));
+    db.close();
+  `;
+  const r = spawnSync(process.execPath, ['--input-type=module', '-e', codigo], {
+    cwd: raiz, env: ambiente({ JUKEBOX_DATA_DIR: pastaDeDados(t), NOTEIRO_REAIS_POR_PULSO: '1' }), encoding: 'utf8', timeout: 15_000,
+  });
+  assert.equal(r.status, 0, r.stderr);
+  const saida = JSON.parse(r.stdout.trim().split('\n').at(-1));
+  assert.equal(saida.depoisPulsos, 5);
+  assert.equal(saida.final, 25);
+  assert.deepEqual(saida.metodos, [{ metodo: 'nota', valor: 5 }, { metodo: 'nota', valor: 20 }]);
+});

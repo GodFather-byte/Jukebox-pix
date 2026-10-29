@@ -14,7 +14,8 @@ function createSettings(directory, mode) {
     `ADMIN_PASSWORD=${password}`,
     `ADMIN_SECRET=${crypto.randomBytes(32).toString('hex')}`,
     'PORT=3000',
-    `HOST=${mode === 'teste' ? '127.0.0.1' : '0.0.0.0'}`,
+    // O cliente escolhe e paga só na tela do jukebox: o servidor não precisa atender a rede.
+    'HOST=127.0.0.1',
     `PAYMENT_PROVIDER=${mode === 'teste' ? 'mock' : 'mercadopago'}`,
     `PLAYER=${mode === 'teste' ? 'sim' : 'auto'}`,
     '# Produção: preencha com as credenciais da SUA conta Mercado Pago.',
@@ -67,7 +68,7 @@ function senhaAleatoria(tamanho = 14) {
 function lerConfiguracao(directory) {
   const file = path.join(directory, '.env');
   if (!fs.existsSync(file)) {
-    return { existe: false, modo: 'producao', nomeLocal: '', senha: senhaAleatoria(), porta: 3000, temToken: false };
+    return { existe: false, modo: 'producao', nomeLocal: '', senha: senhaAleatoria(), porta: 3000, temToken: false, terminal: '', noteiroPorta: '' };
   }
   const values = dotenv.parse(fs.readFileSync(file));
   return {
@@ -77,6 +78,8 @@ function lerConfiguracao(directory) {
     senha: values.ADMIN_PASSWORD || '',
     porta: Number(values.PORT || 3000),
     temToken: Boolean(values.MERCADOPAGO_ACCESS_TOKEN?.trim()),
+    terminal: values.MERCADOPAGO_POINT_TERMINAL || '',
+    noteiroPorta: values.NOTEIRO === 'serial' ? values.NOTEIRO_PORTA || '' : '',
   };
 }
 
@@ -92,6 +95,10 @@ function salvarConfiguracao(directory, campos) {
   const nomeLocal = String(campos.nomeLocal ?? '').trim();
   if (nomeLocal.length > 40) throw new Error('O nome do local pode ter no máximo 40 letras.');
   const token = String(campos.token ?? '').trim();
+  const terminal = String(campos.terminal ?? '').trim();
+  const noteiroPorta = String(campos.noteiroPorta ?? '').trim();
+  if (/\s/.test(terminal) || terminal.length > 120) throw new Error('Maquininha inválida.');
+  if (noteiroPorta.length > 120) throw new Error('Porta do noteiro inválida.');
 
   const file = path.join(directory, '.env');
   const existia = fs.existsSync(file);
@@ -102,13 +109,18 @@ function salvarConfiguracao(directory, campos) {
     if (!existia) fs.rmSync(file);
     throw new Error('Para atender clientes, cole o Access Token da sua conta Mercado Pago.');
   }
-  const valores = { DESKTOP_MODE: modo, ADMIN_PASSWORD: senha, PORT: String(porta), NOME_LOCAL: nomeLocal };
+  const valores = {
+    DESKTOP_MODE: modo, ADMIN_PASSWORD: senha, PORT: String(porta), NOME_LOCAL: nomeLocal,
+    MERCADOPAGO_POINT_TERMINAL: terminal,
+    NOTEIRO: noteiroPorta ? 'serial' : 'desligado',
+    NOTEIRO_PORTA: noteiroPorta,
+  };
   if (token) valores.MERCADOPAGO_ACCESS_TOKEN = token;
   // Rede, provedor e player só mudam junto com o modo: ajuste manual do dono (PLAYER=vlc, HOST=IP) fica.
   if (atuais.DESKTOP_MODE !== modo || !existia) {
     Object.assign(valores, modo === 'teste'
       ? { HOST: '127.0.0.1', PAYMENT_PROVIDER: 'mock', PLAYER: 'sim' }
-      : { HOST: '0.0.0.0', PAYMENT_PROVIDER: 'mercadopago', PLAYER: 'auto' });
+      : { HOST: '127.0.0.1', PAYMENT_PROVIDER: 'mercadopago', PLAYER: 'auto' });
   }
   if (!atuais.ADMIN_SECRET || atuais.ADMIN_SECRET.length < 32) valores.ADMIN_SECRET = crypto.randomBytes(32).toString('hex');
   fs.writeFileSync(file, atualizarEnv(anterior, valores), { mode: 0o600 });

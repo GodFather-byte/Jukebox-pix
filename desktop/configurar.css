@@ -26,8 +26,8 @@ h2 { margin: 0 0 12px; font-size: 16px; }
 .campo:last-child { margin-bottom: 0; }
 .campo small { display: block; color: var(--fraco); margin-top: 4px; }
 .linha { display: flex; gap: 8px; margin-top: 4px; }
-input:not([type=radio]) { width: 100%; margin-top: 4px; padding: 9px 11px; border-radius: 8px; border: 1px solid var(--borda); background: #120d22; color: var(--texto); font: inherit; }
-.linha input { margin-top: 0; }
+input:not([type=radio]), select { width: 100%; margin-top: 4px; padding: 9px 11px; border-radius: 8px; border: 1px solid var(--borda); background: #120d22; color: var(--texto); font: inherit; }
+.linha input, .linha select { margin-top: 0; }
 input:focus { outline: 2px solid var(--destaque); outline-offset: 1px; }
 button { padding: 9px 16px; border-radius: 8px; border: 0; background: var(--destaque); color: #fff; font: inherit; font-weight: 600; cursor: pointer; white-space: nowrap; }
 button.secundario { background: transparent; border: 1px solid var(--borda); color: var(--texto); font-weight: 500; }

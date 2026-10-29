@@ -5,7 +5,7 @@ import { ErroApi } from '../../erros.js';
 const API = 'https://api.mercadopago.com';
 const cfg = config.pagamento.mercadopago;
 
-async function chamar(rota, { metodo = 'GET', corpo, idempotencia } = {}) {
+export async function chamar(rota, { metodo = 'GET', corpo, idempotencia } = {}) {
   if (!cfg.token) throw new ErroApi(500, 'MERCADOPAGO_ACCESS_TOKEN não configurado');
 
   let resposta;

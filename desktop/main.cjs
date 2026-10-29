@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, dialog, shell, utilityProcess, clipboard } = require('electron');
+const { app, BrowserWindow, Menu, dialog, shell, utilityProcess } = require('electron');
 const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
@@ -101,29 +101,19 @@ function installMenu(origin, info, settings) {
           mainWindow.focus();
         } else mainWindow = windowFor(`${origin}/tela`, settings.test ? 'Jukebox Pix — MODO DE TESTE LOCAL' : 'Jukebox Pix');
       } },
-      { label: 'Catálogo do cliente', click: () => windowFor(`${origin}/`, 'Jukebox Pix — Catálogo') },
       { label: 'Painel administrativo', click: () => windowFor(`${origin}/admin`, 'Jukebox Pix — Administração') },
-      { label: 'Abrir telão', click: () => windowFor(`${origin}/tela`, 'Jukebox Pix — Telão') },
-      { label: 'Endereço dos clientes / rede', click: async () => {
-        const address = settings.test ? `${origin} (teste: somente neste computador)` : info.clientUrl;
-        const { response } = await dialog.showMessageBox({
-          type: 'info', title: 'Acesso dos clientes', buttons: ['Fechar', 'Copiar endereço'],
-          message: settings.test ? 'MODO DE TESTE — créditos grátis; sem acesso pela LAN.' : 'Celulares na mesma rede Wi-Fi',
-          detail: `${address}\nPlayer: ${info.player}${info.player === 'sim' ? ' — SIMULADO, nenhum áudio é reproduzido' : ''}\n\nNo Windows, permita o aplicativo somente em redes privadas no firewall. Não abra portas no roteador nem exponha o painel à internet.`,
-        });
-        if (response === 1) clipboard.writeText(settings.test ? origin : info.clientUrl);
-      } },
+      { label: 'Abrir telão (2º monitor)', click: () => windowFor(`${origin}/telao`, 'Jukebox Pix — Telão') },
       { type: 'separator' },
       { label: 'Configurações…', click: configurarEReiniciar },
       { label: 'Abrir pasta de dados e logs', click: () => shell.openPath(dataDir) },
       { label: 'Editar configuração avançada (.env)', click: () => shell.openPath(path.join(dataDir, '.env')) },
       { label: 'Sobre a configuração', click: () => dialog.showMessageBox({
         type: 'info', message: 'Feche o aplicativo antes de editar ou migrar dados.',
-        detail: `Dados e configuração:\n${dataDir}\n\nSenha, Pix e porta mudam em Jukebox Pix → Configurações. O resto fica no arquivo .env, que vale na próxima abertura. Nunca compartilhe esse arquivo.`,
+        detail: `Player: ${info.player}${info.player === 'sim' ? ' (SIMULADO, sem som)' : ''}\n\nDados e configuração:\n${dataDir}\n\nSenha, Pix e porta mudam em Jukebox Pix → Configurações. O resto fica no arquivo .env, que vale na próxima abertura. Nunca compartilhe esse arquivo.`,
       }) },
       { type: 'separator' }, { label: 'Sair', click: () => app.quit() },
     ] },
-    { label: 'Exibir', submenu: [{ role: 'reload', label: 'Recarregar' }, { role: 'togglefullscreen', label: 'Tela cheia' }] },
+    { label: 'Exibir', submenu: [{ role: 'reload', label: 'Recarregar' }, { role: 'togglefullscreen', label: 'Tela cheia', accelerator: 'F11' }] },
   ]));
 }
 
@@ -208,7 +198,11 @@ async function run() {
       installMenu(origin, info, settings);
       mainWindow = windowFor(`${origin}/tela`, settings.test ? 'Jukebox Pix — MODO DE TESTE LOCAL' : 'Jukebox Pix');
       configurando = false;
-      if (!smoke) mainWindow.maximize();
+      // Na boate a tela do jukebox ocupa o monitor todo (F11 ou Exibir → Tela cheia alterna; o menu volta com Alt).
+      if (!smoke) {
+        mainWindow.maximize();
+        if (!settings.test) mainWindow.setFullScreen(true);
+      }
       log('PRONTO');
       if (smoke) {
         mainWindow.webContents.once('did-finish-load', async () => {

@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { api } from '../api.js';
+import { abrirCreditos, api } from '../api.js';
 import { useSessao } from '../context/Sessao.jsx';
 import { useToast } from '../context/Toast.jsx';
 
@@ -18,7 +17,6 @@ const EM_ANDAMENTO = new Set(['pendente', 'aprovado', 'exibindo']);
 export default function Recado() {
   const { sessao, config, saldo, atualizarSessao } = useSessao();
   const mostrarToast = useToast();
-  const navigate = useNavigate();
   const [texto, setTexto] = useState('');
   const [enviando, setEnviando] = useState(false);
   const [meus, setMeus] = useState([]);
@@ -51,7 +49,7 @@ export default function Recado() {
     } catch (erro) {
       mostrarToast(erro.message, {
         tipo: 'erro',
-        acao: erro.codigo === 'SALDO_INSUFICIENTE' ? { texto: 'PAGAR', aoClicar: () => navigate('/pagar') } : undefined,
+        acao: erro.codigo === 'SALDO_INSUFICIENTE' ? { texto: 'PAGAR', aoClicar: abrirCreditos } : undefined,
       });
     } finally {
       setEnviando(false);
@@ -91,7 +89,7 @@ export default function Recado() {
         <button className="btn btn-grande" disabled={Boolean(indisponivel) || enviando || texto.trim().length < 3 || emAndamento >= 2}>
           {enviando ? 'ENVIANDO…' : emAndamento >= 2 ? 'AGUARDE SEUS RECADOS PASSAREM' : `ENVIAR POR ${preco} ${preco === 1 ? 'CRÉDITO' : 'CRÉDITOS'}`}
         </button>
-        {saldo < preco && <button type="button" className="btn btn-ciano btn-grande" onClick={() => navigate('/pagar')}>ADICIONAR CRÉDITOS</button>}
+        {saldo < preco && <button type="button" className="btn btn-ciano btn-grande" onClick={abrirCreditos}>ADICIONAR CRÉDITOS</button>}
       </form>
 
       {meus.length > 0 && (

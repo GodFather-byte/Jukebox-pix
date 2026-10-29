@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { api, formatarDuracao, irParaPagamento } from '../api.js';
+import { abrirCreditos, api, formatarDuracao } from '../api.js';
 import Destaque from './Destaque.jsx';
 import { useSessao } from '../context/Sessao.jsx';
 import { useToast } from '../context/Toast.jsx';
@@ -36,7 +35,6 @@ function Resultado({ item, estado, aoPedir, termo }) {
 export default function BuscaInternet({ termo }) {
   const { sessao, config, preparando, atualizarSessao, recarregarPreparando } = useSessao();
   const mostrar = useToast();
-  const navigate = useNavigate();
   const [fase, setFase] = useState('fechado'); // fechado | buscando | pronto | erro
   const [dados, setDados] = useState(null);
   const [erro, setErro] = useState('');
@@ -102,7 +100,7 @@ export default function BuscaInternet({ termo }) {
       } else {
         mostrar(e.message, {
           tipo: 'erro',
-          acao: e.codigo === 'SALDO_INSUFICIENTE' ? { texto: 'PAGAR', aoClicar: () => irParaPagamento(navigate) } : undefined,
+          acao: e.codigo === 'SALDO_INSUFICIENTE' ? { texto: 'PAGAR', aoClicar: abrirCreditos } : undefined,
         });
       }
     } finally {

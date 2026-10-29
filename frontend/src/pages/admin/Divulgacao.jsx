@@ -92,7 +92,7 @@ function Vinhetas({ chamar, ouvirArquivo }) {
     <>
       <h2>📢 Vinhetas de áudio</h2>
       <p className="nota">
-        Áudios curtos seus (“Peça a sua música pelo QR Code!”, “Happy hour até as 23h!”) que tocam <b>entre duas músicas</b>, a cada tantas músicas.
+        Áudios curtos seus (“Escolha sua música no jukebox!”, “Happy hour até as 23h!”) que tocam <b>entre duas músicas</b>, a cada tantas músicas.
         Não custam crédito e não entram no ranking nem no faturamento. Aceita MP3, M4A, WAV, FLAC ou OGG de até 2 minutos.
       </p>
 
@@ -115,7 +115,7 @@ function Vinhetas({ chamar, ouvirArquivo }) {
       <form className="admin-form" onSubmit={enviar}>
         <div className="admin-form-linha">
           <label>Nome (só você vê)
-            <input className="campo" required maxLength={80} placeholder="Ex.: Peça pelo QR Code" value={titulo} onChange={(e) => setTitulo(e.target.value)} />
+            <input className="campo" required maxLength={80} placeholder="Ex.: Escolha no jukebox" value={titulo} onChange={(e) => setTitulo(e.target.value)} />
           </label>
           <label>Arquivo de áudio
             <input ref={campoArquivo} className="campo" type="file" required accept="audio/*,.mp3,.m4a,.wav,.flac,.ogg" onChange={(e) => setArquivo(e.target.files[0] ?? null)} />
