@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import Capa from '../components/Capa.jsx';
 import { api, formatarDuracao } from '../api.js';
 import { useSessao } from '../context/Sessao.jsx';
 import { botaoDaTecla } from './teclas.js';
@@ -13,10 +14,15 @@ const LINHAS = [
 ];
 const COLUNAS = 10;
 
-// Busca no YouTube pela própria máquina: o áudio e a capa são baixados e a música entra na fila sozinha.
-// Se o download falhar, o crédito volta. Só aparece quando o dono ligou "músicas da internet" no painel.
-export default function Internet({ controle, aoFechar, aviso }) {
-  const { sessao, config, preparando, atualizarSessao, recarregarPreparando } = useSessao();
+// Busca pelo nome, com o teclado da tela e os botões da máquina. Procura primeiro no acervo da casa (o HD);
+// não achou e o dono ligou "músicas da internet", a mesma busca vai ao YouTube: o áudio e a capa são baixados
+// e a música entra na fila sozinha (se o download falhar, o crédito volta).
+const NA_INTERNET = { id: 'internet' }; // última linha dos resultados do acervo
+
+export default function Busca({ controle, aoFechar, aviso, inicio = 'acervo' }) {
+  const { sessao, config, preparando, atualizarSessao, recarregarPreparando, adicionarMusica } = useSessao();
+  const internetLigada = config.youtube.ativo;
+  const [origem, setOrigem] = useState(inicio === 'internet' && internetLigada ? 'internet' : 'acervo');
   const [texto, setTexto] = useState('');
   const [tecla, setTecla] = useState({ l: 1, c: 0 });
   const [fase, setFase] = useState('digitar'); // digitar | buscando | resultados
@@ -25,22 +31,40 @@ export default function Internet({ controle, aoFechar, aviso }) {
   const [confirmar, setConfirmar] = useState(null); // video_id aguardando o segundo TOCAR
   const [erro, setErro] = useState('');
 
-  const buscar = useCallback(async (termo = texto) => {
+  const buscar = useCallback(async (termo = texto, onde = origem) => {
     if (termo.trim().length < 2) { setErro('Escreva pelo menos 2 letras.'); return; }
     setErro('');
+    setOrigem(onde);
+    setConfirmar(null);
     setFase('buscando');
     try {
-      const r = await api(`/youtube/buscar?q=${encodeURIComponent(termo.trim())}&session_id=${sessao.id}`);
-      setResultados(r.resultados);
+      const q = encodeURIComponent(termo.trim());
+      const r = onde === 'acervo'
+        ? await api(`/musicas/buscar?q=${q}`)
+        : await api(`/youtube/buscar?q=${q}&session_id=${sessao.id}`);
+      setResultados(onde === 'acervo' && internetLigada ? [...r.resultados, NA_INTERNET] : r.resultados);
       setIndice(0);
       setFase('resultados');
     } catch (e) {
       setErro(e.message);
       setFase('digitar');
     }
-  }, [texto, sessao.id]);
+  }, [texto, origem, sessao.id, internetLigada]);
+
+  async function tocarDoAcervo(musica) {
+    try {
+      await adicionarMusica(musica);
+      aviso(`♪ NA FILA: ${musica.titulo.toUpperCase()}`);
+      aoFechar();
+    } catch (e) {
+      if (e.codigo === 'SALDO_INSUFICIENTE') aviso('COLOQUE CRÉDITOS PARA TOCAR', 'erro', true);
+      else setErro(e.message);
+    }
+  }
 
   async function pedir(item) {
+    if (item === NA_INTERNET) { buscar(texto, 'internet'); return; }
+    if (origem === 'acervo') { tocarDoAcervo(item); return; }
     if (!item.na_casa && confirmar !== item.video_id) { setConfirmar(item.video_id); return; }
     setConfirmar(null);
     try {
@@ -89,7 +113,7 @@ export default function Internet({ controle, aoFechar, aviso }) {
 
   controle.current = (botao) => {
     if (botao === 'ritmo' || botao === 'voltar') {
-      if (fase === 'resultados') { setFase('digitar'); setConfirmar(null); } else aoFechar();
+      if (fase === 'resultados') { setFase('digitar'); setConfirmar(null); setOrigem(inicio === 'internet' && internetLigada ? 'internet' : 'acervo'); } else aoFechar();
       return;
     }
     if (fase === 'digitar') {
@@ -105,14 +129,21 @@ export default function Internet({ controle, aoFechar, aviso }) {
     }
   };
 
+  // A escolhida fica sempre à vista: com 60 resultados do acervo a lista rola.
+  useEffect(() => {
+    document.querySelector('.pn-resultados button.ativo')?.scrollIntoView({ block: 'nearest' });
+  }, [indice, resultados]);
+
   const baixando = (id) => preparando.some((p) => p.video_id === id);
 
   return (
-    <div className="pn-janela-fundo" role="dialog" aria-modal="true" aria-label="Buscar música na internet">
+    <div className="pn-janela-fundo" role="dialog" aria-modal="true" aria-label={origem === 'acervo' ? 'Buscar música no acervo' : 'Buscar música na internet'}>
       <section className="pn-janela pn-internet">
         <header>
-          <h1>BUSCAR NA INTERNET</h1>
-          <span>A música e a capa são baixadas do YouTube · {config.youtube.preco} {config.youtube.preco === 1 ? 'crédito' : 'créditos'} · até {config.youtube.max_min} min</span>
+          <h1>{origem === 'acervo' ? 'BUSCAR MÚSICA' : 'BUSCAR NA INTERNET'}</h1>
+          <span>{origem === 'acervo'
+            ? `Procura em todos os CDs da casa pelo nome da música, do artista ou do CD${internetLigada ? ' · não achou? Tem a internet' : ''}`
+            : `A música e a capa são baixadas do YouTube · ${config.youtube.preco} ${config.youtube.preco === 1 ? 'crédito' : 'créditos'} · até ${config.youtube.max_min} min`}</span>
           <button type="button" className="pn-fechar" aria-label="Fechar" onClick={aoFechar}>✕</button>
         </header>
         {erro && <p className="pn-erro" role="alert">{erro}</p>}
@@ -144,10 +175,29 @@ export default function Internet({ controle, aoFechar, aviso }) {
 
         {fase === 'resultados' && (
           <>
-            <p className="pn-dica">Resultados para “{texto.trim()}”</p>
+            <p className="pn-dica">{origem === 'acervo' ? 'No acervo' : 'Na internet'}: “{texto.trim()}”</p>
             {resultados.length === 0 ? <p className="pn-vazio">Nada encontrado. Tente outras palavras.</p> : (
               <ol className="pn-resultados">
-                {resultados.map((r, i) => (
+                {origem === 'acervo' && resultados.map((m, i) => (
+                  <li key={m.id}>
+                    {m === NA_INTERNET ? (
+                      <button type="button" className={`pn-res-internet ${i === indice ? 'ativo' : ''}`} onClick={() => buscar(texto, 'internet')}>
+                        <span className="pn-res-icone">🌐</span>
+                        <span className="pn-res-texto"><b>Não achou? Buscar na internet</b><small>A música e a capa vêm do YouTube</small></span>
+                      </button>
+                    ) : (
+                      <button type="button" className={i === indice ? 'ativo' : ''} onClick={() => { setIndice(i); pedir(m); }}>
+                        <Capa capa={m.capa} icone={m.icone} cor={m.cor} titulo={m.cd} className="pn-res-capa" />
+                        <span className="pn-res-texto">
+                          <b>{m.titulo}</b>
+                          <small>{m.artista} · {m.cd} · {formatarDuracao(m.duracao)}</small>
+                        </span>
+                        <span className="pn-res-preco">{m.creditos} {m.creditos === 1 ? 'CRÉDITO' : 'CRÉDITOS'}</span>
+                      </button>
+                    )}
+                  </li>
+                ))}
+                {origem === 'internet' && resultados.map((r, i) => (
                   <li key={r.video_id}>
                     <button type="button" className={i === indice ? 'ativo' : ''} onClick={() => { setIndice(i); pedir(r); }}>
                       <img src={r.thumb} alt="" loading="lazy" />
@@ -163,7 +213,7 @@ export default function Internet({ controle, aoFechar, aviso }) {
                 ))}
               </ol>
             )}
-            <p className="pn-dica">▼ escolhe · TOCAR pede (de novo para confirmar) · RITMO volta à busca</p>
+            <p className="pn-dica">{origem === 'acervo' ? '▼ escolhe · TOCAR põe na fila' : '▼ escolhe · TOCAR pede (de novo para confirmar)'} · RITMO volta à busca</p>
           </>
         )}
       </section>

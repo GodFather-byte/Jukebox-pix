@@ -8,7 +8,7 @@ const PADRAO = {
   subir: ['ArrowUp'],
   tocar: ['Enter', ' ', 'NumpadEnter'],
   creditos: ['Insert', 'F2'],
-  internet: ['F3'],
+  buscar: ['F3'],
   voltar: ['Escape', 'Backspace', 'End'],
 };
 
@@ -22,7 +22,7 @@ const JUKELINUX = {
   subir: ['ArrowRight'],
   tocar: ['Enter', 'NumpadEnter'],
   creditos: ['NumpadDivide', 'F2'],
-  internet: ['F3'],
+  buscar: ['F3'],
   voltar: ['NumpadMultiply', 'Escape'],
 };
 

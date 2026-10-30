@@ -36,6 +36,8 @@ toque/botões físicos. Próxima meta do dono: **piloto na boate**.
   Tela: `frontend/src/maquina/teclas.js` (`definirTeclado`, `ehTeclaDeCredito`); captura em `Maquina.jsx` manda
   `POST /api/quiosque/pulso`, que agrupa como os pulsos da serial (`pulsoDeTeclado` em `backend/services/noteiro.js`).
   A máquina analisada não tem touchscreen: tudo pelos botões (Menu / abre a tela de créditos).
+- Busca pelo nome na máquina (`frontend/src/maquina/Busca.jsx`, antigo `Internet.jsx`): ritmo fixo "BUSCAR" e
+  tecla F3; procura no acervo (`GET /api/musicas/buscar`) e a última linha leva a mesma busca ao YouTube se ligado.
 - Falta para o piloto nessas máquinas: modo aparelho + instalador por pendrive, tocar clipes (vão para a TV),
   importar histórico de `tocados.txt`, fechamento com % do ponto (eles usam 50%).
 

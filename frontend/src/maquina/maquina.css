@@ -237,6 +237,9 @@
   padding: 1vh 1.4vw; border-radius: 1.6vh; border: 1px solid rgba(255, 255, 255, 0.1); background: rgba(255, 255, 255, 0.04);
 }
 .pn-resultados img { width: 16vh; height: 9vh; object-fit: cover; border-radius: 1vh; }
+.pn-resultados .pn-res-capa { width: 9vh; height: 9vh; justify-self: center; border-radius: 1vh; object-fit: cover; }
+.pn-res-icone { display: grid; place-items: center; font-size: 4.4vh; }
+.pn-res-internet { border-style: dashed !important; }
 .pn-res-texto { display: flex; flex-direction: column; min-width: 0; }
 .pn-res-texto b { font-size: 2.3vh; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pn-res-texto small { font-size: 1.7vh; color: #c9c2ec; }
