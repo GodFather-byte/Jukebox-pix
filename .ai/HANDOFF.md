@@ -45,6 +45,10 @@ toque/botões físicos. Próxima meta do dono: **piloto na boate**.
 - Falta para o piloto nessas máquinas: modo aparelho + instalador por pendrive, tocar clipes (vão para a TV),
   importar histórico de `tocados.txt`, fechamento com % do ponto (eles usam 50%).
 
+- Limite por compra de Pix/cartão: R$ 10 a R$ 50 por padrão (`VALOR_MIN`, `VALOR_MAX` em `backend/config.js`);
+  os botões de valor da tela (`config.valoresPix`) saem dessa faixa. Noteiro sem limite.
+- Ideia aprovada para depois: central na nuvem + app PWA para o parceiro e os pontos (relatório a cada 6 h).
+
 ## Próximos passos
 1. Dono testar o instalador do CI (Actions → Desktop → Artifacts) no computador da boate, primeiro em
    "Só experimentar", depois "Atender clientes" só com Pix e valores baixos.

@@ -75,7 +75,7 @@ test('jukebox: uma sessão só, nota e cartão creditam nela, e túnel/proxy fic
   assert.equal((await api(`/sessoes/${sessao}`)).dados.saldo, 10);
   assert.equal((await api('/quiosque/nota-teste', { valor: 0 })).status, 400);
 
-  const cartao = (await api('/pagamento/iniciar', { valor: 5, session_id: sessao, metodo: 'cartao', tipo_cartao: 'debito' })).dados;
+  const cartao = (await api('/pagamento/iniciar', { valor: 10, session_id: sessao, metodo: 'cartao', tipo_cartao: 'debito' })).dados;
   assert.equal(cartao.metodo, 'cartao');
   assert.equal(cartao.qr_imagem, null);
   // Outro cartão tira o anterior da maquininha.
@@ -84,10 +84,13 @@ test('jukebox: uma sessão só, nota e cartão creditam nela, e túnel/proxy fic
   await api(`/pagamento/mock/confirmar/${outro.id}`, {});
   assert.equal((await api(`/sessoes/${sessao}`)).dados.saldo, 30);
 
-  const pix = (await api('/pagamento/iniciar', { valor: 5, session_id: sessao })).dados;
+  const pix = (await api('/pagamento/iniciar', { valor: 10, session_id: sessao })).dados;
+  // Limite por compra (padrão R$ 10 a R$ 50): nem troco miúdo nem R$ 500 de uma vez.
+  assert.equal((await api('/pagamento/iniciar', { valor: 5, session_id: sessao })).status, 400);
+  assert.equal((await api('/pagamento/iniciar', { valor: 60, session_id: sessao })).status, 400);
   assert.equal(pix.metodo, 'pix');
   assert.ok(pix.qr_imagem.startsWith('data:image/png'));
-  assert.equal((await api('/pagamento/iniciar', { valor: 5, session_id: sessao, metodo: 'boleto' })).status, 400);
+  assert.equal((await api('/pagamento/iniciar', { valor: 10, session_id: sessao, metodo: 'boleto' })).status, 400);
 
   const tunel = await fetch(`${base}/api/quiosque`, { headers: { 'X-Forwarded-For': '203.0.113.9' }, signal: AbortSignal.timeout(10_000) });
   assert.equal(tunel.status, 403, 'quem chega por túnel/proxy não é a tela do jukebox');
