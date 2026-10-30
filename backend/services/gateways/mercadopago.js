@@ -14,7 +14,7 @@ const LOG = path.join(process.env.JUKEBOX_DATA_DIR || process.cwd(), 'logs', 'me
 // Causas mais comuns, em português para o dono resolver sozinho (códigos da API de pagamentos do Mercado Pago).
 const MOTIVOS = {
   13253: 'a conta do Mercado Pago não tem chave Pix cadastrada (app Mercado Pago → Pix → Minhas chaves)',
-  4050: 'o e-mail do pagador foi recusado pelo Mercado Pago',
+  4050: 'o e-mail do pagador foi recusado pelo Mercado Pago (troque MERCADOPAGO_EMAIL_PAGADOR na configuração avançada)',
   7: 'o Access Token não está liberado para receber pagamentos reais (ative as credenciais de produção)',
   401: 'o Access Token é inválido ou foi renovado: cole o token novo nas Configurações',
 };
@@ -96,7 +96,7 @@ export const mercadopago = {
         transaction_amount: valor,
         description: descricao,
         payment_method_id: 'pix',
-        payer: { email: 'cliente@jukebox.local' },
+        payer: { email: cfg.emailPagador },
         external_reference: referencia,
         date_of_expiration: comOffsetBrasilia(expiraEm),
         ...(cfg.urlWebhook && { notification_url: `${cfg.urlWebhook.replace(/\/$/, '')}/api/pagamento/webhook` }),

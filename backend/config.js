@@ -71,6 +71,9 @@ export const config = {
       urlWebhook: env.WEBHOOK_PUBLIC_URL || '',
       // Maquininha Point (débito e crédito): o ID aparece na tela de configuração ("Procurar maquininhas").
       terminal: env.MERCADOPAGO_POINT_TERMINAL || '',
+      // O Pix exige um e-mail de pagador, mas o cliente da jukebox é anônimo. O Mercado Pago recusa domínio
+      // inválido (".local"); example.com é reservado para isso e nunca recebe e-mail de ninguém.
+      emailPagador: env.MERCADOPAGO_EMAIL_PAGADOR?.trim() || 'cliente@example.com',
     },
   },
 
