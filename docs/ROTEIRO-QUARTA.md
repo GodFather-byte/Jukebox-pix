@@ -18,6 +18,9 @@ e, no celular, o **app** com os números da máquina e a demonstração das 30.
 
 ## Domingo ou segunda: instalar na máquina da boate (cerca de 1 h 30)
 
+> **Atalho:** dá para adiantar tudo no notebook, com o SSD num adaptador USB, e na boate só encaixar, montar o HD e
+> importar (30 min). Passo a passo em [PREPARAR-SSD.md](PREPARAR-SSD.md).
+
 Siga o [GUIA-INSTALACAO.md](GUIA-INSTALACAO.md) do começo ao fim. Resumo:
 1. ☐ Fechamento na JukeLinux (anote os relógios).
 2. ☐ Linux Mint no SSD, **com o HD da JukeLinux desligado**.
