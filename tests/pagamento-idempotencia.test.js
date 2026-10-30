@@ -18,7 +18,7 @@ test('confirmação repetida de Pix não duplica créditos e cancelamento poster
     import { iniciar, confirmar, cancelar, obter } from './backend/services/pagamentos.js';
     try {
       const sessao = criarSessao();
-      const pagamento = await iniciar({ valor: 5, sessionId: sessao.id });
+      const pagamento = await iniciar({ valor: 10, sessionId: sessao.id });
       assert.equal(obterSessao(sessao.id).saldo, 0);
       assert.equal(confirmar(pagamento.id), true);
       const saldoConfirmado = obterSessao(sessao.id).saldo;

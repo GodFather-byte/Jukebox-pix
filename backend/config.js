@@ -46,10 +46,10 @@ export const config = {
   // Segunda cópia de cada backup (pasta do OneDrive/Google Drive, pendrive, HD externo). Opcional.
   backupCopiaDir: env.BACKUP_COPIA_DIR ? path.resolve(base, env.BACKUP_COPIA_DIR) : null,
 
-  // 1 crédito = R$ 1,00
-  valoresPix: [5, 10, 20, 50],
-  valorMin: num('VALOR_MIN', 1),
-  valorMax: num('VALOR_MAX', 500),
+  // 1 crédito = R$ 1,00. Pix e cartão de R$ 10 a R$ 50 por compra: ninguém (nem quem bebeu demais) põe R$ 500
+  // de uma vez. Dinheiro no noteiro não tem limite. Os botões de valor da tela ficam dentro da faixa.
+  valorMin: num('VALOR_MIN', 10),
+  valorMax: num('VALOR_MAX', 50),
 
   // Minutos sem uso até os créditos vencerem. 0 (padrão) = nunca vencem: o saldo fica na máquina, como numa jukebox de bar.
   sessaoTtlMin: num('SESSAO_TTL_MIN', 0),
@@ -57,6 +57,8 @@ export const config = {
   filaMax: num('FILA_MAX', 60),
   divisaoUsuario: num('DIVISAO_USUARIO', 50), // % do usuário; o resto vai pra boate
   creditosDonoMax: num('CREDITOS_DONO_MAX', 50), // teto do crédito de cortesia (1 vez por dia)
+  // Avisa no Telegram se entrar mais que isto (R$) pelo noteiro/moedeiro/chave em 10 minutos. 0 = não avisa.
+  creditoAlerta10Min: num('CREDITO_ALERTA_10MIN', 150),
 
   pagamento: {
     provedor: env.PAYMENT_PROVIDER || 'mock',
@@ -118,10 +120,17 @@ export const config = {
   },
 };
 
+// Botões de valor da tela de créditos: os de sempre que cabem na faixa, com o mínimo e o máximo sempre presentes.
+config.valoresPix = [...new Set([config.valorMin, 10, 20, 30, 50, config.valorMax])]
+  .filter((v) => v >= config.valorMin && v <= config.valorMax)
+  .sort((a, b) => a - b)
+  .slice(0, 6);
+
 // Falha cedo em produção: modo de teste ou senha padrão liberariam créditos/admin pra qualquer um no WiFi.
 export function validarConfig() {
   if (!config.producao) return;
   const problemas = [];
+  if (!(config.valorMin >= 1 && config.valorMax >= config.valorMin)) problemas.push('VALOR_MIN e VALOR_MAX: o mínimo precisa ser pelo menos 1 e não passar do máximo');
   if (config.pagamento.provedor === 'mock') problemas.push('PAYMENT_PROVIDER=mock libera créditos grátis; use um provedor real');
   if (config.admin.senha === 'admin') problemas.push('ADMIN_PASSWORD ainda é a senha padrão');
   if (problemas.length) throw new Error(`Configuração insegura para produção:\n - ${problemas.join('\n - ')}`);

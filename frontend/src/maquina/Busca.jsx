@@ -55,8 +55,8 @@ export default function Busca({ controle, aoFechar, aviso, inicio = 'acervo' }) 
 
   async function tocarDoAcervo(musica) {
     try {
-      await adicionarMusica(musica);
-      aviso(`♪ NA FILA: ${musica.titulo.toUpperCase()}`);
+      const r = await adicionarMusica(musica);
+      aviso(r.premio ? '🎉 VOCÊ GANHOU 1 CRÉDITO NO SORTEIO! ESCOLHA MAIS UMA' : `♪ NA FILA: ${musica.titulo.toUpperCase()}`);
       aoFechar();
     } catch (e) {
       if (e.codigo === 'SALDO_INSUFICIENTE') aviso('COLOQUE CRÉDITOS PARA TOCAR', 'erro', true);

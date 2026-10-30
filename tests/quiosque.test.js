@@ -75,7 +75,7 @@ test('jukebox: uma sessão só, nota e cartão creditam nela, e túnel/proxy fic
   assert.equal((await api(`/sessoes/${sessao}`)).dados.saldo, 10);
   assert.equal((await api('/quiosque/nota-teste', { valor: 0 })).status, 400);
 
-  const cartao = (await api('/pagamento/iniciar', { valor: 5, session_id: sessao, metodo: 'cartao', tipo_cartao: 'debito' })).dados;
+  const cartao = (await api('/pagamento/iniciar', { valor: 10, session_id: sessao, metodo: 'cartao', tipo_cartao: 'debito' })).dados;
   assert.equal(cartao.metodo, 'cartao');
   assert.equal(cartao.qr_imagem, null);
   // Outro cartão tira o anterior da maquininha.
@@ -84,10 +84,13 @@ test('jukebox: uma sessão só, nota e cartão creditam nela, e túnel/proxy fic
   await api(`/pagamento/mock/confirmar/${outro.id}`, {});
   assert.equal((await api(`/sessoes/${sessao}`)).dados.saldo, 30);
 
-  const pix = (await api('/pagamento/iniciar', { valor: 5, session_id: sessao })).dados;
+  const pix = (await api('/pagamento/iniciar', { valor: 10, session_id: sessao })).dados;
+  // Limite por compra (padrão R$ 10 a R$ 50): nem troco miúdo nem R$ 500 de uma vez.
+  assert.equal((await api('/pagamento/iniciar', { valor: 5, session_id: sessao })).status, 400);
+  assert.equal((await api('/pagamento/iniciar', { valor: 60, session_id: sessao })).status, 400);
   assert.equal(pix.metodo, 'pix');
   assert.ok(pix.qr_imagem.startsWith('data:image/png'));
-  assert.equal((await api('/pagamento/iniciar', { valor: 5, session_id: sessao, metodo: 'boleto' })).status, 400);
+  assert.equal((await api('/pagamento/iniciar', { valor: 10, session_id: sessao, metodo: 'boleto' })).status, 400);
 
   const tunel = await fetch(`${base}/api/quiosque`, { headers: { 'X-Forwarded-For': '203.0.113.9' }, signal: AbortSignal.timeout(10_000) });
   assert.equal(tunel.status, 403, 'quem chega por túnel/proxy não é a tela do jukebox');
@@ -255,4 +258,81 @@ test('menu do operador: relógio total e parcial, divisão com o ponto e fechame
 
   assert.equal(r.depois.parcial.entrou, 5);
   assert.equal(r.depois.total.entrou, 35);
+});
+
+test('palhinha: a aleatória toca só o trecho configurado; música paga e padrão tocam inteiras', { timeout: 20_000 }, (t) => {
+  const r = rodar(t, `
+    const { argumentosMpv, argumentosVlc } = await import('./backend/audio.js');
+    const cfg = await import('./backend/services/configuracoes.js');
+    const padrao = cfg.lerAutomatico().trecho_seg;
+    cfg.salvarAutomatico({ trecho_seg: 120 });
+    let erro = null;
+    try { cfg.salvarAutomatico({ trecho_seg: 9999 }); } catch (e) { erro = e.message; }
+    console.log(JSON.stringify({
+      padrao, salvo: cfg.automaticoTrechoSeg(), erro,
+      mpv: argumentosMpv('a.mp3', { duracao: 120 }), mpvInteira: argumentosMpv('a.mp3'),
+      vlc: argumentosVlc('a.mp3', { duracao: 120 }),
+    }));
+  `);
+  assert.equal(r.padrao, 0, 'por padrão a aleatória toca inteira');
+  assert.equal(r.salvo, 120);
+  assert.match(r.erro, /Trecho/);
+  assert.ok(r.mpv.includes('--length=120'));
+  assert.ok(!r.mpvInteira.some((a) => a.startsWith('--length')));
+  assert.ok(r.vlc.includes('--stop-time=120'));
+});
+
+test('sorteio de crédito: música paga concorre e o prêmio é cortesia; limite de Pix a cada 30 minutos', { timeout: 20_000 }, (t) => {
+  const r = rodar(t, `
+    const { db } = await import('./backend/database.js');
+    const cfg = await import('./backend/services/configuracoes.js');
+    const fila = await import('./backend/services/fila.js');
+    const { creditarNota } = await import('./backend/services/noteiro.js');
+    const { sessaoDoQuiosque } = await import('./backend/services/quiosque.js');
+    const { iniciar } = await import('./backend/services/pagamentos.js');
+    const agora = new Date().toISOString();
+    db.prepare("INSERT INTO categorias (id, nome, icone, cor) VALUES ('pop', 'Pop', '🎵', '#fff')").run();
+    db.prepare("INSERT INTO artistas (id, nome, categoria_id, criado_em) VALUES ('a', 'A', 'pop', ?)").run(agora);
+    db.prepare("INSERT INTO cds (id, titulo, artista_id, categoria_id, status, data_criacao, data_lancamento, criado_em) VALUES ('c', 'C', 'a', 'pop', 'lancado', ?, ?, ?)").run(agora, agora, agora);
+    for (const id of ['m1', 'm2', 'm3']) db.prepare("INSERT INTO musicas (id, titulo, cd_id, duracao, creditos, arquivo, criado_em) VALUES (?, ?, 'c', 180, 1, 'x.mp3', ?)").run(id, id, agora);
+
+    const sessao = sessaoDoQuiosque().id;
+    creditarNota(10);
+    const semSorteio = fila.adicionar(sessao, 'm1');
+    cfg.salvarRegras({ sorteio: { a_cada: 2 } });
+    fila.definirSorteio(() => 0.1); // 0,1 < 1/2: ganha
+    const ganhou = fila.adicionar(sessao, 'm2');
+    fila.definirSorteio(() => 0.9); // perde
+    const perdeu = fila.adicionar(sessao, 'm3');
+    const s = db.prepare('SELECT saldo, saldo_cortesia FROM sessoes WHERE id = ?').get(sessao);
+
+    // Limite: R$ 100 em 30 min. Dois Pix de 50 confirmados; o terceiro é recusado.
+    for (let i = 0; i < 2; i++) {
+      const p = await iniciar({ valor: 50, sessionId: sessao });
+      db.prepare("UPDATE pagamentos SET status = 'confirmado', confirmado_em = ? WHERE id = ?").run(new Date().toISOString(), p.id);
+    }
+    let erro = null;
+    try { await iniciar({ valor: 10, sessionId: sessao }); } catch (e) { erro = e.codigo; }
+    cfg.salvarRegras({ limite_30min: 0 });
+    const liberado = Boolean(await iniciar({ valor: 10, sessionId: sessao }));
+    console.log(JSON.stringify({ premios: [semSorteio.premio, ganhou.premio, perdeu.premio], s, erro, liberado }));
+  `);
+  assert.deepEqual(r.premios, [0, 1, 0]);
+  // 10 pagos + 1 do sorteio - 3 músicas = 8; a 3ª música já gastou o crédito do prêmio (cortesia sai primeiro).
+  assert.deepEqual(r.s, { saldo: 8, saldo_cortesia: 0 });
+  assert.equal(r.erro, 'LIMITE_PERIODO');
+  assert.equal(r.liberado, true, 'limite 0 desliga');
+});
+
+test('alerta de dinheiro demais: passa do limite em 10 minutos e é marcado, sem bloquear o crédito', { timeout: 20_000 }, (t) => {
+  const r = rodar(t, `
+    const { creditarNota, situacaoNoteiro } = await import('./backend/services/noteiro.js');
+    const { sessaoDoQuiosque } = await import('./backend/services/quiosque.js');
+    creditarNota(100);
+    const primeira = situacaoNoteiro().ultima.suspeito;
+    creditarNota(60);
+    const segunda = situacaoNoteiro().ultima.suspeito;
+    console.log(JSON.stringify({ primeira, segunda, saldo: sessaoDoQuiosque().saldo }));
+  `, { CREDITO_ALERTA_10MIN: '150' });
+  assert.deepEqual(r, { primeira: false, segunda: true, saldo: 160 });
 });

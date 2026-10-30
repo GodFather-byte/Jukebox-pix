@@ -16,6 +16,8 @@ function paraFormulario(r) {
     bonus_faixas: r.bonus.faixas.map((f) => ({ valor: String(f.valor), bonus: String(f.bonus) })),
     bonus_agenda: r.bonus.agenda.map((j) => ({ inicio: j.inicio, fim: j.fim })),
     preco_lancamento: String(r.precos.lancamento),
+    sorteio_a_cada: String(r.sorteio.a_cada),
+    limite_30min: String(r.limite_30min),
     aviso: r.aviso,
   };
 }
@@ -70,6 +72,8 @@ export default function Regras({ chamar }) {
             agenda: form.bonus_agenda,
           },
           precos: { lancamento: Number(form.preco_lancamento) },
+          sorteio: { a_cada: Number(form.sorteio_a_cada) },
+          limite_30min: Number(form.limite_30min),
           aviso: form.aviso,
         },
       });
@@ -200,6 +204,18 @@ export default function Regras({ chamar }) {
             {numero('prioridade_limite')}
           </label>
         </div>
+
+        <h2>🎁 Sorteio de crédito</h2>
+        <label>Em média, 1 a cada quantas músicas pagas ganha 1 crédito grátis (0 = desligado)
+          {numero('sorteio_a_cada')}
+          <small>Ex.: 50. A tela comemora “Você ganhou 1 crédito!”. O prêmio é cortesia: não entra no faturamento.</small>
+        </label>
+
+        <h2>🛡️ Limite de Pix e cartão</h2>
+        <label>No máximo quantos reais a cada 30 minutos nesta máquina (0 = sem limite)
+          {numero('limite_30min')}
+          <small>Cada compra já vai de R$ 10 a R$ 50. Este limite segura quem bebeu demais e quer pagar sem parar. Dinheiro no noteiro não tem limite.</small>
+        </label>
 
         {mensagem && <p className={`aviso ${mensagem.tipo === 'erro' ? 'aviso-erro' : 'aviso-ok'}`}>{mensagem.texto}</p>}
         <button className="btn btn-grande" disabled={salvando}>{salvando ? 'SALVANDO…' : 'SALVAR REGRAS'}</button>

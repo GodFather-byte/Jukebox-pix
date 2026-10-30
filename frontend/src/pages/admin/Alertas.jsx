@@ -6,6 +6,7 @@ const TIPOS = [
   ['disco', '💾 Pouco espaço em disco', 'Menos de 10% ou 5 GB livres. Avisa no máximo uma vez por dia.'],
   ['backup', '🗄 O backup falhou', 'Inclui a cópia extra (pendrive solto, nuvem offline).'],
   ['inicio', '🟢 A jukebox ligou', 'Útil para saber que o notebook reiniciou (queda de energia, atualização do Windows).'],
+  ['credito', '🚨 Dinheiro demais entrando de uma vez', 'Mais que o normal em 10 minutos pelo noteiro, moedeiro ou chave (CREDITO_ALERTA_10MIN, padrão R$ 150). Pode ser alguém com um teclado na máquina ou a placa com defeito.'],
   ['youtube', '🌐 Músicas da internet falhando', 'Três falhas seguidas ao pesquisar ou baixar (yt-dlp desatualizado ou internet fora). Avisa no máximo a cada 2 horas.'],
 ];
 
