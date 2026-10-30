@@ -228,3 +228,31 @@ test('placa JukeLinux: 20 teclas de crédito seguidas viram R$ 20 de uma vez; se
   assert.equal(desligado.saldo, 0);
   assert.equal(desligado.perfil, 'padrao');
 });
+
+test('menu do operador: relógio total e parcial, divisão com o ponto e fechamento que zera só o parcial', { timeout: 20_000 }, (t) => {
+  const r = rodar(t, `
+    const { creditarNota } = await import('./backend/services/noteiro.js');
+    const { lerRelogio, fecharRelogio } = await import('./backend/services/relogio.js');
+    creditarNota(20);
+    creditarNota(10);
+    const antes = lerRelogio();
+    await new Promise((r) => setTimeout(r, 1100));
+    const fechado = fecharRelogio();
+    await new Promise((r) => setTimeout(r, 1100));
+    creditarNota(5);
+    const depois = lerRelogio();
+    console.log(JSON.stringify({ antes, fechado, depois }));
+  `, { DIVISAO_USUARIO: '50' });
+
+  assert.equal(r.antes.total.entrou, 30);
+  assert.equal(r.antes.parcial.entrou, 30);
+  assert.equal(r.antes.parcial.por_metodo.nota, 30);
+  assert.deepEqual([r.antes.parcial.empresa, r.antes.parcial.ponto], [15, 15]);
+
+  assert.equal(r.fechado.parcial.entrou, 0, 'o fechamento zera o parcial');
+  assert.equal(r.fechado.total.entrou, 30, 'o total nunca zera');
+  assert.equal(r.fechado.ultimo_fechamento.entrou, 30);
+
+  assert.equal(r.depois.parcial.entrou, 5);
+  assert.equal(r.depois.total.entrou, 35);
+});

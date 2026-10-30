@@ -10,8 +10,9 @@ const LINHAS = [
   ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'],
   ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', 'Ç'],
   ['Z', 'X', 'C', 'V', 'B', 'N', 'M', '-', '⌫', '⌫'],
-  ['ESPAÇO', 'ESPAÇO', 'ESPAÇO', 'ESPAÇO', 'ESPAÇO', 'BUSCAR', 'BUSCAR', 'BUSCAR', 'BUSCAR', 'BUSCAR'],
+  ['ESPAÇO', 'ESPAÇO', 'ESPAÇO', 'ESPAÇO', 'BUSCAR', 'BUSCAR', 'BUSCAR', 'INTERNET', 'INTERNET', 'INTERNET'],
 ];
+const SEM_INTERNET = LINHAS.map((linha) => linha.map((v) => (v === 'INTERNET' ? 'BUSCAR' : v)));
 const COLUNAS = 10;
 
 // Busca pelo nome, com o teclado da tela e os botões da máquina. Procura primeiro no acervo da casa (o HD);
@@ -22,6 +23,7 @@ const NA_INTERNET = { id: 'internet' }; // última linha dos resultados do acerv
 export default function Busca({ controle, aoFechar, aviso, inicio = 'acervo' }) {
   const { sessao, config, preparando, atualizarSessao, recarregarPreparando, adicionarMusica } = useSessao();
   const internetLigada = config.youtube.ativo;
+  const teclado = internetLigada ? LINHAS : SEM_INTERNET;
   const [origem, setOrigem] = useState(inicio === 'internet' && internetLigada ? 'internet' : 'acervo');
   const [texto, setTexto] = useState('');
   const [tecla, setTecla] = useState({ l: 1, c: 0 });
@@ -86,7 +88,8 @@ export default function Busca({ controle, aoFechar, aviso, inicio = 'acervo' }) 
     setErro('');
     if (valor === '⌫') setTexto((t) => t.slice(0, -1));
     else if (valor === 'ESPAÇO') setTexto((t) => (t.length < 60 ? `${t} ` : t));
-    else if (valor === 'BUSCAR') buscar();
+    else if (valor === 'BUSCAR') buscar(texto, 'acervo');
+    else if (valor === 'INTERNET') buscar(texto, 'internet');
     else setTexto((t) => (t.length < 60 ? t + valor : t));
   }
 
@@ -121,7 +124,7 @@ export default function Busca({ controle, aoFechar, aviso, inicio = 'acervo' }) 
       if (botao === 'anterior') setTecla(({ l, c }) => (c > 0 ? { l, c: c - 1 } : { l: (l - 1 + LINHAS.length) % LINHAS.length, c: COLUNAS - 1 }));
       if (botao === 'descer') setTecla(({ l, c }) => ({ l: (l + 1) % LINHAS.length, c }));
       if (botao === 'subir') setTecla(({ l, c }) => ({ l: (l - 1 + LINHAS.length) % LINHAS.length, c }));
-      if (botao === 'tocar') apertarTecla(LINHAS[tecla.l][tecla.c]);
+      if (botao === 'tocar') apertarTecla(teclado[tecla.l][tecla.c]);
     } else if (fase === 'resultados' && resultados.length) {
       if (botao === 'descer' || botao === 'proxima') { setIndice((i) => (i + 1) % resultados.length); setConfirmar(null); }
       if (botao === 'subir' || botao === 'anterior') { setIndice((i) => (i - 1 + resultados.length) % resultados.length); setConfirmar(null); }
@@ -153,15 +156,15 @@ export default function Busca({ controle, aoFechar, aviso, inicio = 'acervo' }) 
             <div className="pn-campo" aria-live="polite">{texto || <span>Digite o nome da música ou do artista</span>}<i /></div>
             {fase === 'buscando' ? <p className="pn-dica"><span className="carregando carregando-pequeno" /> Procurando…</p> : (
               <div className="pn-teclado">
-                {LINHAS.map((linha, l) => (
+                {teclado.map((linha, l) => (
                   <div key={l} className="pn-teclado-linha">
                     {linha.map((valor, c) => {
                       if (c > 0 && linha[c - 1] === valor) return null; // tecla larga ocupa várias colunas
                       const largura = linha.filter((v) => v === valor).length;
                       const ativa = tecla.l === l && linha[tecla.c] === valor;
                       return (
-                        <button key={c} type="button" style={{ flex: largura }} className={`${ativa ? 'ativa' : ''} ${valor === 'BUSCAR' ? 'destaque' : ''}`} onClick={() => { setTecla({ l, c }); apertarTecla(valor); }}>
-                          {valor}
+                        <button key={c} type="button" style={{ flex: largura }} className={`${ativa ? 'ativa' : ''} ${valor === 'BUSCAR' || valor === 'INTERNET' ? 'destaque' : ''}`} onClick={() => { setTecla({ l, c }); apertarTecla(valor); }}>
+                          {valor === 'INTERNET' ? '🌐 INTERNET' : valor === 'BUSCAR' ? '🔎 BUSCAR' : valor}
                         </button>
                       );
                     })}

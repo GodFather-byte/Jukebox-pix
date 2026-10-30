@@ -41,6 +41,7 @@ Ao abrir, o aplicativo mostra a **tela da jukebox** ("palco neon"):
 | TOCAR | `Enter`, `Espaço` | põe a faixa escolhida na fila |
 | CRÉDITOS | `Insert`, `F2` | abre a tela de créditos |
 | BUSCAR | `F3` | busca pelo nome no acervo (e na internet, se ligada) |
+| MENU | `F10` | menu do operador: relógio (total e parcial) e fechamento do caixa |
 | VOLTAR | `Esc`, `End` | fecha a janela aberta |
 
 Com **toque**: toque numa capa para escolher o CD, numa faixa para escolher e de novo para tocar, num ritmo para trocar de gênero.

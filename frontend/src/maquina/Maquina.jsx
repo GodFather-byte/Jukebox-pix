@@ -5,6 +5,7 @@ import { api, formatarDuracao } from '../api.js';
 import { SessaoProvider, useSessao } from '../context/Sessao.jsx';
 import { useAgora, useApi, useManterAceso } from '../hooks.js';
 import Busca from './Busca.jsx';
+import Menu from './Menu.jsx';
 import Pagamento from './Pagamento.jsx';
 import { botaoDaTecla, ehTeclaDeCredito } from './teclas.js';
 import './maquina.css';
@@ -96,7 +97,7 @@ function Tela() {
   const [cdIdx, setCdIdx] = useState(0);
   const [faixaIdx, setFaixaIdx] = useState(0);
   const [faixas, setFaixas] = useState({});
-  const [janela, setJanela] = useState(null); // null | 'creditos' | 'buscar'
+  const [janela, setJanela] = useState(null); // null | 'creditos' | 'buscar' | 'menu'
   const [aviso, setAviso] = useState(null);
   const controleJanela = useRef(null);
   const faixaRitmos = useRef(null);
@@ -173,6 +174,7 @@ function Tela() {
   }, [adicionarMusica, avisar]);
 
   const apertar = useCallback((botao) => {
+    if (botao === 'menu' && janela !== 'menu') { setJanela('menu'); return undefined; } // o operador abre de qualquer tela
     if (janela) return controleJanela.current?.(botao);
     const total = musicas?.length ?? 0;
     if (botao === 'ritmo') mudarRitmo(1);
@@ -285,6 +287,7 @@ function Tela() {
 
       {aviso && <div className={`pn-aviso ${aviso.tipo}`} key={aviso.id} role="status">{aviso.texto}</div>}
       {janela === 'creditos' && <Pagamento controle={controleJanela} aoFechar={() => setJanela(null)} />}
+      {janela === 'menu' && <Menu controle={controleJanela} aoFechar={() => setJanela(null)} aviso={avisar} />}
       {janela === 'buscar' && <Busca controle={controleJanela} aoFechar={() => setJanela(null)} aviso={avisar} />}
     </main>
   );

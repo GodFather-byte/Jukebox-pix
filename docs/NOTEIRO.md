@@ -33,7 +33,9 @@ JukeLinux**. Isso grava `TECLADO_PERFIL=jukelinux` e `NOTEIRO=teclado` no `.env`
 | Ritmo | R | Troca o ritmo |
 | Tocar | Enter | Põe na fila |
 | Cancelar | * (numérico) | Voltar |
-| Menu | / (numérico) | Tela de créditos (Pix e cartão) |
+| Menu | / (numérico) | Menu do operador: relógio total/parcial, divisão com o ponto e fechamento do caixa |
+
+O cliente chega à tela de créditos (Pix e cartão) apertando TOCAR sem saldo.
 
 Pulsos seguidos (até 600 ms entre eles) viram um crédito só na tela: R$ 20 aparecem como "+20".
 Outra tecla de crédito: `NOTEIRO_TECLA` com o código da tecla (ex.: `KeyC`).

@@ -9,11 +9,13 @@ const PADRAO = {
   tocar: ['Enter', ' ', 'NumpadEnter'],
   creditos: ['Insert', 'F2'],
   buscar: ['F3'],
+  menu: ['F10'],
   voltar: ['Escape', 'Backspace', 'End'],
 };
 
 // A placa de botões das jukeboxes JukeLinux (interfaceteclado.txt da máquina): CD+/CD- nas setas ↑/↓,
-// Música+ no D, Música- na seta →, Ritmo no R, Cancelar no * e Menu no / do teclado numérico.
+// Música+ no D, Música- na seta →, Ritmo no R, Cancelar no * e Menu (operador: relógio e fechamento) no /
+// do teclado numérico. O cliente chega aos créditos pelo TOCAR sem saldo.
 const JUKELINUX = {
   ritmo: ['KeyR', 'F1'],
   anterior: ['ArrowDown'],
@@ -21,8 +23,9 @@ const JUKELINUX = {
   descer: ['KeyD'],
   subir: ['ArrowRight'],
   tocar: ['Enter', 'NumpadEnter'],
-  creditos: ['NumpadDivide', 'F2'],
+  creditos: ['F2'],
   buscar: ['F3'],
+  menu: ['NumpadDivide', 'F10'],
   voltar: ['NumpadMultiply', 'Escape'],
 };
 
