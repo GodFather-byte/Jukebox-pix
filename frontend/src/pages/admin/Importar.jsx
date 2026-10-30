@@ -72,7 +72,8 @@ export default function Importar({ chamar, aoImportar }) {
         Os arquivos são <b>movidos</b> para a biblioteca, então a pasta fica vazia depois.
       </p>
       <code className="importar-pasta">{varredura?.pasta ?? 'musicas\\_importar'}</code>
-      <pre className="importar-exemplo">{`Artista/CD/01 - Faixa.mp3            (escolha a categoria aqui na tela)
+      <pre className="importar-exemplo">{`Artista - CD/01 - Faixa.mp3          (acervo de outra jukebox; categoria aqui na tela)
+Artista/CD/01 - Faixa.mp3            (escolha a categoria aqui na tela)
 Categoria/Artista/CD/01 - Faixa.mp3  (a categoria vem do nome da pasta)
 
 Dicas: "2019 - Nome do CD" ou "Nome do CD (2019)" define o ano.
@@ -86,7 +87,7 @@ Uma imagem na pasta do CD (capa.jpg, cover.jpg...) vira a capa.`}</pre>
       {varredura && (
         <>
           {varredura.cds.length === 0 && (
-            <p className="vazio">Nenhum CD encontrado. Confira se as faixas estão em <b>Artista/CD</b> dentro da pasta acima.</p>
+            <p className="vazio">Nenhum CD encontrado. Confira se as faixas estão em <b>Artista - CD</b> ou <b>Artista/CD</b> dentro da pasta acima.</p>
           )}
 
           {varredura.cds.length > 0 && (

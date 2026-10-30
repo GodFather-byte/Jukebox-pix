@@ -1,5 +1,5 @@
 # Handoff
-Atualizado por: Claude Code em 2026-10-29 (branch `claude/vibrant-faraday-etr6xs`, recriada da `main`)
+Atualizado por: Claude Code em 2026-10-30 (branch `claude/vibrant-faraday-etr6xs`, recriada da `main`)
 
 ## Objetivo atual
 Jukebox de bar no computador da máquina: música por créditos, Pix, Point, noteiro, busca YouTube e tela por
@@ -20,6 +20,15 @@ toque/botões físicos. Próxima meta do dono: **piloto na boate**.
   antes (`chamadaFeita` em `player.js`) e a tela mostra "Tocando de graça" (`Maquina.jsx`, `atual.automatica`).
 - "Abrir o jukebox ao ligar o computador": caixa na tela de configuração (`INICIAR_COM_SISTEMA` no `.env`),
   aplicada em `desktop/inicio-automatico.cjs` (Windows: login item; Linux: `~/.config/autostart`).
+
+## Migração das máquinas de um parceiro (JukeLinux)
+- O dono vai trocar o sistema de ~30 jukeboxes de um parceiro (dono da JukeLinux) pelo Jukebox-pix, num SSD novo
+  (o HD antigo fica guardado intacto). O acervo deles é MP3 comum em `~/musicas/ARTISTA - CD/NN - faixa.mp3`.
+- Importador aceita esse formato: pasta única "Artista - CD" (`separarArtista` em `backend/services/importacao.js`).
+  Pastas só com clipes (.mpg/.mp4, ~15% do que toca lá) aparecem como ignoradas: vídeo ainda não é suportado.
+- A importação MOVE os arquivos: copie o acervo do HD antigo para a pasta de importar, nunca aponte para o HD original.
+- Falta para o piloto nessas máquinas: ler o crédito do moedeiro/noteiro/chave de 20 deles (aguardando diagnóstico),
+  modo aparelho + instalador por pendrive, tocar clipes, importar histórico de `tocados.txt`, fechamento com % do ponto.
 
 ## Próximos passos
 1. Dono testar o instalador do CI (Actions → Desktop → Artifacts) no computador da boate, primeiro em
