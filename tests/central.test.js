@@ -10,10 +10,9 @@ import { fileURLToPath } from 'node:url';
 const raiz = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SENHA_DONO = 'senha-do-dono-123';
 
-const pastaDeDados = (t) => {
+const novaPasta = () => {
   const pasta = path.join(raiz, 'tests', `.central-${randomUUID()}`);
   fs.mkdirSync(pasta, { recursive: true });
-  t.after(() => fs.rmSync(pasta, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 }));
   return pasta;
 };
 
@@ -27,14 +26,22 @@ async function portaLivre() {
 }
 
 // Sobe a central num processo à parte, com banco próprio, e devolve um cliente HTTP simples.
-async function subirCentral(t, pasta) {
+// Um único after: no Windows o banco fica preso até o processo sair, então primeiro encerra e só depois apaga.
+async function subirCentral(t) {
+  const pasta = novaPasta();
   const porta = await portaLivre();
   const proc = spawn(process.execPath, ['server.js'], {
     cwd: path.join(raiz, 'central'),
     env: { ...process.env, PORT: String(porta), CENTRAL_DB: path.join(pasta, 'central.db'), CENTRAL_SEGREDO: 'segredo-de-teste', CENTRAL_DONO_LOGIN: 'William', CENTRAL_DONO_SENHA: SENHA_DONO },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
-  t.after(async () => { proc.kill(); await new Promise((r) => (proc.exitCode !== null ? r() : proc.once('exit', r))); });
+  t.after(async () => {
+    if (proc.exitCode === null) {
+      proc.kill();
+      await new Promise((r) => proc.once('exit', r));
+    }
+    fs.rmSync(pasta, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
+  });
   const base = `http://127.0.0.1:${porta}`;
   for (let i = 0; i < 100; i++) {
     try { if ((await fetch(`${base}/healthz`)).ok) break; } catch { /* subindo */ }
@@ -49,7 +56,7 @@ async function subirCentral(t, pasta) {
     });
     return { status: r.status, dados: await r.json().catch(() => null) };
   };
-  return { base, chamar };
+  return { base, chamar, pasta };
 }
 
 const relatorioDeTeste = (hoje) => ({
@@ -66,7 +73,7 @@ const relatorioDeTeste = (hoje) => ({
 });
 
 test('central: dono cadastra, máquina manda relatório e cada acesso vê só o que é dele', { timeout: 60_000 }, async (t) => {
-  const { chamar } = await subirCentral(t, pastaDeDados(t));
+  const { chamar } = await subirCentral(t);
   const hoje = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
 
   assert.equal((await chamar('/api/login', { metodo: 'POST', corpo: { login: 'william', senha: 'errada' } })).status, 401);
@@ -121,8 +128,7 @@ test('central: dono cadastra, máquina manda relatório e cada acesso vê só o 
 });
 
 test('jukebox → central: o relatório da máquina chega com o relógio, os dias e as mais pedidas', { timeout: 60_000 }, async (t) => {
-  const pasta = pastaDeDados(t);
-  const { chamar, base } = await subirCentral(t, pasta);
+  const { chamar, base, pasta } = await subirCentral(t);
   const dono = (await chamar('/api/login', { metodo: 'POST', corpo: { login: 'william', senha: SENHA_DONO } })).dados.token;
   const maquina = (await chamar('/api/admin/maquinas', { metodo: 'POST', token: dono, corpo: { nome: 'Piloto' } })).dados;
 
