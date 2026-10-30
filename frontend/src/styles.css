@@ -485,6 +485,7 @@ mark { background: rgba(0, 212, 255, 0.28); color: inherit; border-radius: 3px; 
 
 .importar-pasta { display: block; margin: 8px 0; padding: 8px 12px; background: rgba(0, 0, 0, 0.35); border-radius: 8px; color: var(--ciano); font-size: 0.82rem; word-break: break-all; }
 .importar-exemplo { margin: 0 0 16px; padding: 12px 14px; background: var(--superficie); border: 1px solid var(--borda); border-radius: var(--raio); font: 0.78rem/1.6 var(--fonte-num); color: var(--texto-2); white-space: pre-wrap; }
+.importar-botoes { display: flex; flex-wrap: wrap; gap: 10px; }
 .importar-topo { display: flex; justify-content: space-between; align-items: center; margin: 20px 0 8px; color: var(--texto-2); font-size: 0.85rem; }
 .importar-lista { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; }
 .importar-item { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 14px; background: var(--superficie); border: 1px solid var(--borda); border-radius: var(--raio); }

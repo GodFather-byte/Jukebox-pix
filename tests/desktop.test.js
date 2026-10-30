@@ -201,3 +201,14 @@ test('maquininha e noteiro escolhidos na tela vão para o .env, e vazio desliga'
   assert.equal(env.MERCADOPAGO_POINT_TERMINAL, '');
   assert.throws(() => salvarConfiguracao(dir, { modo: 'producao', senha: 'senha-bem-forte', porta: 3000, terminal: 'com espaço' }), /Maquininha/);
 });
+
+test('pasta de músicas de outra jukebox: a tela grava o caminho completo no .env', (t) => {
+  const dir = directory(t);
+  const base = { modo: 'teste', senha: 'senha-bem-forte', porta: 3000 };
+  const pasta = path.resolve(dir, 'HD antigo', 'musicas');
+  salvarConfiguracao(dir, { ...base, acervoExterno: pasta });
+  assert.equal(lerConfiguracao(dir).acervoExterno, pasta, 'caminho com espaço volta igual');
+  assert.throws(() => salvarConfiguracao(dir, { ...base, acervoExterno: 'musicas' }), /caminho completo/);
+  salvarConfiguracao(dir, { ...base, acervoExterno: '' });
+  assert.equal(lerConfiguracao(dir).acervoExterno, '');
+});

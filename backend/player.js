@@ -82,10 +82,11 @@ function argumentos(arquivo, ipc, ganho = 0, automatica = false) {
   return backend.tipo === 'mpv' ? argumentosMpv(arquivo, { volume, ipc, ganho }) : argumentosVlc(arquivo, { volume, ganho });
 }
 
-// Só toca arquivos dentro da pasta de músicas (o caminho vem do banco).
+// Só toca arquivos dentro da pasta de músicas ou do acervo de outra jukebox (o caminho vem do banco).
 function resolverArquivo(relativo) {
   const absoluto = path.resolve(config.musicasDir, relativo);
-  return absoluto.startsWith(config.musicasDir + path.sep) ? absoluto : null;
+  const permitidas = [config.musicasDir, config.acervoExternoDir].filter(Boolean);
+  return permitidas.some((pasta) => absoluto.startsWith(pasta + path.sep)) ? absoluto : null;
 }
 
 const avisarFila = () => emitirTodos('fila');

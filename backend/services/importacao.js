@@ -7,7 +7,8 @@ import { criarCd, EXT_AUDIO, EXT_IMAGEM, validarPreco } from './biblioteca.js';
 
 fs.mkdirSync(config.importDir, { recursive: true });
 
-const NOMES_DE_CAPA = ['capa', 'cover', 'folder', 'front', 'albumart'];
+const EXT_VIDEO = new Set(['.mp4', '.mpg', '.mpeg', '.avi', '.mkv', '.vob']);
+const NOMES_DE_CAPA =['capa', 'cover', 'folder', 'front', 'albumart'];
 const CORES = ['#FF1493', '#00D4FF', '#F5B700', '#A855F7', '#22C55E', '#EF4444', '#6366F1', '#FF8A00'];
 
 const natural = (a, b) => a.localeCompare(b, 'pt-BR', { numeric: true, sensitivity: 'base' });
@@ -22,24 +23,40 @@ function separarAno(nome) {
   return { ano: null, titulo: nome.trim() };
 }
 
+// Pasta única no formato de outras jukeboxes: "ARTISTA - CD 1" vira artista + CD.
+// Sem " - " no nome (ex.: "Coletanea Funk 4"), o nome da pasta vale para os dois.
+export function separarArtista(nome) {
+  const partes = nome.split(/\s+[-–]\s+/);
+  if (partes.length < 2 || !partes[0].trim()) return { artista: nome.trim(), nomeCd: nome.trim() };
+  return { artista: partes[0].trim(), nomeCd: partes.slice(1).join(' - ').trim() };
+}
+
 /**
  * Procura CDs em config.importDir. A pasta de um CD é a que tem arquivos de áudio dentro:
+ *   Artista - CD/faixas            (uma pasta só, como o acervo de outras jukeboxes)
  *   Artista/CD/faixas              (a categoria é escolhida na tela)
  *   Categoria/Artista/CD/faixas    (a categoria vem do nome da pasta)
+ * origem 'externo' procura em config.acervoExternoDir (acervo de outra jukebox, só leitura).
  * Só lista; nada é movido aqui.
  */
-export function escanear() {
+export function escanear(origem = 'importar') {
+  const raiz = pastaDaOrigem(origem);
   const cds = [];
   const ignorados = [];
   const titulosDoArtista = db.prepare('SELECT titulo FROM cds WHERE artista_id = ?');
 
   function registrar(dir, segmentos, audios, entradas) {
-    if (segmentos.length < 2) {
-      ignorados.push({ chave: segmentos.join('/') || '(raiz da pasta)', motivo: 'Músicas soltas: coloque-as dentro de uma pasta Artista/CD.' });
+    if (!segmentos.length) {
+      ignorados.push({ chave: '(raiz da pasta)', motivo: 'Músicas soltas: coloque-as dentro de uma pasta Artista - CD.' });
       return;
     }
 
-    const [categoriaPasta, artista, nomeCd] = segmentos.length === 3 ? segmentos : [null, ...segmentos];
+    let categoriaPasta = null;
+    let artista;
+    let nomeCd;
+    if (segmentos.length === 1) ({ artista, nomeCd } = separarArtista(segmentos[0]));
+    else if (segmentos.length === 3) [categoriaPasta, artista, nomeCd] = segmentos;
+    else [artista, nomeCd] = segmentos;
     const { titulo, ano } = separarAno(nomeCd);
     const imagens = entradas.filter((e) => e.isFile() && EXT_IMAGEM.has(extensao(e.name))).map((e) => e.name).sort(natural);
     const capa = imagens.find((nome) => NOMES_DE_CAPA.includes(path.parse(nome).name.toLowerCase())) ?? imagens[0] ?? null;
@@ -58,6 +75,9 @@ export function escanear() {
     // Dirent de link simbólico não é arquivo nem pasta: links são ignorados de propósito.
     const audios = entradas.filter((e) => e.isFile() && EXT_AUDIO.has(extensao(e.name))).map((e) => e.name).sort(natural);
     if (audios.length) registrar(dir, segmentos, audios, entradas);
+    else if (segmentos.length && entradas.some((e) => e.isFile() && EXT_VIDEO.has(extensao(e.name)))) {
+      ignorados.push({ chave: segmentos.join('/'), motivo: 'Só tem clipes (vídeo): ainda não são importados.' });
+    }
 
     if (segmentos.length < 3) {
       for (const entrada of entradas) {
@@ -66,16 +86,27 @@ export function escanear() {
     }
   }
 
-  andar(config.importDir, []);
+  andar(raiz, []);
   cds.sort((a, b) => natural(a.chave, b.chave));
   return { cds, ignorados };
 }
 
-// O que o navegador recebe: sem caminhos do disco.
-export function listar() {
-  const { cds, ignorados } = escanear();
+function pastaDaOrigem(origem) {
+  if (origem !== 'externo') return config.importDir;
+  if (!config.acervoExternoDir) throw new ErroApi(400, 'Nenhuma pasta de acervo de outra jukebox foi configurada.');
+  if (!fs.existsSync(config.acervoExternoDir)) {
+    throw new ErroApi(400, `Pasta do acervo não encontrada (${config.acervoExternoDir}). O HD está ligado?`);
+  }
+  return config.acervoExternoDir;
+}
+
+// O que o navegador recebe: sem caminhos do disco além da própria pasta procurada.
+export function listar(origem = 'importar') {
+  const { cds, ignorados } = escanear(origem);
   return {
-    pasta: config.importDir,
+    origem: origem === 'externo' ? 'externo' : 'importar',
+    externo_configurado: Boolean(config.acervoExternoDir),
+    pasta: pastaDaOrigem(origem),
     cds: cds.map((cd) => ({
       chave: cd.chave,
       categoria_pasta: cd.categoriaPasta,
@@ -113,12 +144,14 @@ function limparPastasVazias(dir, ehRaiz = true) {
  * Importa os CDs escolhidos. As chaves vêm do navegador, mas só valem se baterem com uma pasta
  * que o escaneamento acabou de achar: nenhum caminho do cliente é usado no disco.
  * Cada CD é independente: um que falha não derruba os outros (e seus arquivos ficam onde estavam).
+ * Do acervo externo, as faixas ficam onde estão e só o cadastro é criado.
  */
-export async function importar({ chaves, categoriaId, status, preco = 1 }) {
+export async function importar({ chaves, categoriaId, status, preco = 1, origem = 'importar' }) {
+  const externo = origem === 'externo';
   if (!Array.isArray(chaves) || !chaves.length) throw new ErroApi(400, 'Selecione ao menos um CD.');
   validarPreco(preco); // erro de preço vale para o lote todo, antes de mover qualquer arquivo
 
-  const porChave = new Map(escanear().cds.map((cd) => [cd.chave, cd]));
+  const porChave = new Map(escanear(externo ? 'externo' : 'importar').cds.map((cd) => [cd.chave, cd]));
   const importados = [];
   const erros = [];
 
@@ -138,7 +171,8 @@ export async function importar({ chaves, categoriaId, status, preco = 1 }) {
         preco,
         capa: cd.capa ? { caminho: path.join(cd.dir, cd.capa), nomeOriginal: cd.capa } : null,
         faixas: cd.audios.map((nome) => ({ caminho: path.join(cd.dir, nome), nomeOriginal: nome })),
-        detalheLog: `importação em lote (${cd.audios.length} música(s))`,
+        detalheLog: `${externo ? 'acervo de outra jukebox, tocando de onde está' : 'importação em lote'} (${cd.audios.length} música(s))`,
+        manterNoLugar: externo,
       });
       importados.push({ chave, ...resultado });
     } catch (erro) {
@@ -147,6 +181,6 @@ export async function importar({ chaves, categoriaId, status, preco = 1 }) {
     }
   }
 
-  limparPastasVazias(config.importDir);
+  if (!externo) limparPastasVazias(config.importDir);
   return { importados, erros };
 }

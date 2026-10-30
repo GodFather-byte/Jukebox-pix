@@ -11,6 +11,8 @@ export default function Importar({ chamar, aoImportar }) {
   const [importando, setImportando] = useState(false);
   const [resultado, setResultado] = useState(null);
   const [erro, setErro] = useState('');
+  const [origem, setOrigem] = useState('importar');
+  const externo = origem === 'externo';
 
   useEffect(() => {
     chamar('/admin/cadastros').then((c) => {
@@ -19,12 +21,14 @@ export default function Importar({ chamar, aoImportar }) {
     }).catch(() => {});
   }, [chamar]);
 
-  async function procurar() {
+  async function procurar(deOnde = origem) {
+    setOrigem(deOnde);
+    setVarredura(null);
     setErro('');
     setResultado(null);
     setCarregando(true);
     try {
-      const dados = await chamar('/admin/importacao');
+      const dados = await chamar(`/admin/importacao?origem=${deOnde}`);
       setVarredura(dados);
       setMarcados(new Set(dados.cds.filter((cd) => !cd.ja_existe).map((cd) => cd.chave)));
     } catch (e) {
@@ -50,11 +54,11 @@ export default function Importar({ chamar, aoImportar }) {
     try {
       const r = await chamar('/admin/importacao', {
         metodo: 'POST',
-        corpo: { chaves: [...marcados], categoria_id: categoriaId, status, preco: Number(preco || 1) },
+        corpo: { chaves: [...marcados], categoria_id: categoriaId, status, preco: Number(preco || 1), origem },
       });
       setResultado(r);
       if (r.importados.length) aoImportar();
-      const dados = await chamar('/admin/importacao');
+      const dados = await chamar(`/admin/importacao?origem=${origem}`);
       setVarredura(dados);
       setMarcados(new Set());
     } catch (e) {
@@ -71,22 +75,32 @@ export default function Importar({ chamar, aoImportar }) {
         Copie suas pastas de CDs para a pasta abaixo (pelo Explorador de Arquivos) e clique em <b>Procurar CDs</b>.
         Os arquivos são <b>movidos</b> para a biblioteca, então a pasta fica vazia depois.
       </p>
+      <p className="nota">
+        <b>Acervo de outra jukebox:</b> com o HD da máquina antiga ligado e a pasta dele informada na configuração
+        do aplicativo, as músicas tocam direto de lá. Nada é movido, copiado ou apagado nesse HD.
+      </p>
       <code className="importar-pasta">{varredura?.pasta ?? 'musicas\\_importar'}</code>
-      <pre className="importar-exemplo">{`Artista/CD/01 - Faixa.mp3            (escolha a categoria aqui na tela)
+      <pre className="importar-exemplo">{`Artista - CD/01 - Faixa.mp3          (acervo de outra jukebox; categoria aqui na tela)
+Artista/CD/01 - Faixa.mp3            (escolha a categoria aqui na tela)
 Categoria/Artista/CD/01 - Faixa.mp3  (a categoria vem do nome da pasta)
 
 Dicas: "2019 - Nome do CD" ou "Nome do CD (2019)" define o ano.
 Uma imagem na pasta do CD (capa.jpg, cover.jpg...) vira a capa.`}</pre>
 
-      <button className="btn" onClick={procurar} disabled={carregando || importando}>
-        {carregando ? 'PROCURANDO…' : '🔎 PROCURAR CDs'}
-      </button>
+      <div className="importar-botoes">
+        <button className="btn" onClick={() => procurar('importar')} disabled={carregando || importando}>
+          {carregando && !externo ? 'PROCURANDO…' : '🔎 PROCURAR CDs'}
+        </button>
+        <button className="btn" onClick={() => procurar('externo')} disabled={carregando || importando}>
+          {carregando && externo ? 'PROCURANDO…' : '💽 ACERVO DE OUTRA JUKEBOX'}
+        </button>
+      </div>
       {erro && <p className="aviso aviso-erro importar-espaco">{erro}</p>}
 
       {varredura && (
         <>
           {varredura.cds.length === 0 && (
-            <p className="vazio">Nenhum CD encontrado. Confira se as faixas estão em <b>Artista/CD</b> dentro da pasta acima.</p>
+            <p className="vazio">Nenhum CD encontrado. Confira se as faixas estão em <b>Artista - CD</b> ou <b>Artista/CD</b> dentro da pasta acima.</p>
           )}
 
           {varredura.cds.length > 0 && (
@@ -153,7 +167,7 @@ Uma imagem na pasta do CD (capa.jpg, cover.jpg...) vira a capa.`}</pre>
             <p className="aviso aviso-ok">✔ {resultado.importados.length} CD(s) importado(s) com {resultado.importados.reduce((t, c) => t + c.total_musicas, 0)} músicas.</p>
           )}
           {resultado.erros.map((e) => (
-            <p key={e.chave} className="aviso aviso-erro importar-espaco"><b>{e.chave}</b>: {e.erro.replace(/\.?$/, '.')} Os arquivos continuam na pasta.</p>
+            <p key={e.chave} className="aviso aviso-erro importar-espaco"><b>{e.chave}</b>: {e.erro.replace(/\.?$/, '.')} {externo ? 'Nada foi alterado no HD.' : 'Os arquivos continuam na pasta.'}</p>
           ))}
         </div>
       )}

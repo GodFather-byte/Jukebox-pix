@@ -177,16 +177,17 @@ router.post(
 // ---------- Importação em lote (pasta) ----------
 
 router.get('/importacao', (req, res) => {
-  res.json(importacao.listar());
+  res.json(importacao.listar(req.query.origem === 'externo' ? 'externo' : 'importar'));
 });
 
 router.post('/importacao', async (req, res) => {
-  const { chaves, categoria_id: categoriaId, status, preco } = req.body ?? {};
+  const { chaves, categoria_id: categoriaId, status, preco, origem } = req.body ?? {};
   const resultado = await importacao.importar({
     chaves,
     categoriaId,
     status: status === 'lancado' ? 'lancado' : 'novo',
     preco,
+    origem: origem === 'externo' ? 'externo' : 'importar',
   });
   if (resultado.importados.length) emitirTodos('lancamentos');
   res.json(resultado);
