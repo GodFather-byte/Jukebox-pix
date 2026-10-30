@@ -228,3 +228,17 @@ test('placa de botões JukeLinux: perfil vai para o .env e, sem noteiro na seria
   ({ env } = readSettings(dir, {}));
   assert.deepEqual([env.TECLADO_PERFIL, env.NOTEIRO], ['padrao', 'desligado']);
 });
+
+test('central na tela de configuração: só https, e token em branco mantém o que já estava', (t) => {
+  const dir = directory(t);
+  const base = { modo: 'teste', senha: 'senha-bem-forte', porta: 3000 };
+  assert.throws(() => salvarConfiguracao(dir, { ...base, centralUrl: 'http://central.com' }), /https/);
+  salvarConfiguracao(dir, { ...base, centralUrl: 'https://central.exemplo.com/', centralToken: 'jbx_abc' });
+  let { env } = readSettings(dir, {});
+  assert.deepEqual([env.CENTRAL_URL, env.CENTRAL_TOKEN], ['https://central.exemplo.com', 'jbx_abc']);
+  const lido = lerConfiguracao(dir);
+  assert.deepEqual([lido.centralUrl, lido.temTokenCentral, lido.centralToken], ['https://central.exemplo.com', true, undefined], 'o token não volta para a tela');
+  salvarConfiguracao(dir, { ...base, centralUrl: 'https://central.exemplo.com', centralToken: '' });
+  ({ env } = readSettings(dir, {}));
+  assert.equal(env.CENTRAL_TOKEN, 'jbx_abc');
+});

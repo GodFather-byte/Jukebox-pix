@@ -1,0 +1,49 @@
+# Central do Jukebox Pix no Render (https://render.com): New → Blueprint → escolha este repositório.
+# O banco SQLite fica no disco persistente /dados (plano pago Starter: o plano grátis apaga o disco a cada deploy).
+# CENTRAL_DONO_LOGIN e CENTRAL_DONO_SENHA criam o seu login no primeiro uso: preencha no painel do Render.
+services:
+  - type: web
+    name: jukebox-pix-central
+    runtime: docker
+    rootDir: central
+    dockerfilePath: ./Dockerfile
+    plan: starter
+    region: virginia
+    healthCheckPath: /healthz
+    autoDeploy: true
+    disk:
+      name: dados
+      mountPath: /dados
+      sizeGB: 1
+    envVars:
+      - key: CENTRAL_SEGREDO
+        generateValue: true
+      - key: CENTRAL_DONO_LOGIN
+        sync: false
+      - key: CENTRAL_DONO_SENHA
+        sync: false
+      - key: CENTRAL_DONO_NOME
+        value: Dono
+      - key: CENTRAL_FUSO
+        value: America/Sao_Paulo
+
+  # Demonstração para apresentar (30 máquinas de exemplo, logins dono/parceiro/boate). Pode ser grátis:
+  # o banco é recriado toda vez que o serviço liga, então não importa perder o disco.
+  - type: web
+    name: jukebox-pix-demo
+    runtime: docker
+    rootDir: central
+    dockerfilePath: ./Dockerfile
+    plan: free
+    region: virginia
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - key: CENTRAL_DEMO
+        value: "1"
+      - key: CENTRAL_DB
+        value: /tmp/demo.db
+      - key: CENTRAL_SEGREDO
+        generateValue: true
+      - key: DEMO_SENHA
+        sync: false

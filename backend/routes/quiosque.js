@@ -4,6 +4,7 @@ import { ErroApi } from '../erros.js';
 import { creditarNota, pulsoDeTeclado, situacaoNoteiro } from '../services/noteiro.js';
 import { sessaoDoQuiosque } from '../services/quiosque.js';
 import { fecharRelogio, lerRelogio } from '../services/relogio.js';
+import { enviarRelatorio } from '../services/central.js';
 
 const router = Router();
 
@@ -37,7 +38,9 @@ router.get('/relogio', (req, res) => {
 });
 
 router.post('/relogio/fechar', (req, res) => {
-  res.json(fecharRelogio());
+  const relogio = fecharRelogio();
+  enviarRelatorio(); // o fechamento chega no app na hora (sem esperar as 6 h); falha não atrapalha o caixa
+  res.json(relogio);
 });
 
 // Só no modo teste: simula uma nota entrando no noteiro.

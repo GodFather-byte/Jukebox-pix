@@ -12,16 +12,23 @@
   - `crons/`: lançamentos, backup, manutenção (consulta pagamentos pendentes a cada 5 s), vigia.
 - `frontend/`: React + Vite. Entrada: `frontend/src/main.jsx` → `App.jsx`.
   - `maquina/`: **tela do cliente** (rota `/` e `/tela`). `Maquina.jsx` (carrossel, faixas, botões),
-    `Pagamento.jsx` (colocar créditos), `Internet.jsx` (busca no YouTube com teclado na tela),
+    `Pagamento.jsx` (colocar créditos), `Busca.jsx` (busca no acervo e no YouTube com teclado na tela),
+    `Menu.jsx` (menu do operador: relógio e fechamento), `Escolha.jsx` (fila normal ou tocar a seguir),
     `teclas.js` (botões físicos → teclas), `maquina.css`.
   - `pages/AdminPanel.jsx` + `pages/admin/`: painel do dono (`/admin`). `pages/Telao.jsx`: 2º monitor (`/telao`).
   - `context/Sessao.jsx`: sessão da máquina, fila e eventos em tempo real (SSE `/api/eventos`).
 - `desktop/`: aplicativo Electron. `main.cjs` (janela, menu, sobe o backend), `settings.cjs` (`.env`),
   `configurar.*` + `configuracao.cjs` (tela de configuração), `ferramentas.cjs` (mpv/ffmpeg/yt-dlp do instalador),
   `smoke.mjs` (teste do pacote no CI).
+- `central/`: **central na nuvem + app PWA** (serviço separado, não vai no instalador). `server.js` (API e
+  estáticos), `painel.js` (totais e o que cada papel vê), `auth.js`, `db.js`, `demo.js` (30 máquinas de exemplo),
+  `public/` (app sem framework: `app.js`, `sw.js`, `manifest.webmanifest`), `Dockerfile`. Deploy: `render.yaml`.
+  A jukebox manda o relatório por `backend/services/central.js`.
 - `scripts/baixar-ferramentas.mjs`: baixa mpv/ffmpeg/yt-dlp para o instalador (roda no CI).
-- `tests/`: `node --test`. `quiosque.test.js` (máquina, pagamentos, noteiro), `desktop.test.js`, `backend.test.js`.
-- `docs/`: `NOTEIRO.md` (placa e Arduino), `HOSPEDAGEM.md`, `NOVAS-FUNCIONALIDADES.md` (guia antigo do painel).
+- `tests/`: `node --test`. `quiosque.test.js` (máquina, pagamentos, noteiro), `desktop.test.js`, `backend.test.js`,
+  `importacao.test.js`, `central.test.js` (central e envio da jukebox).
+- `docs/`: `GUIA-INSTALACAO.md` (passo a passo do dono), `CENTRAL.md` (central e app), `ROTEIRO-QUARTA.md`,
+  `NOTEIRO.md` (placa, Arduino e JukeLinux), `HOSPEDAGEM.md`, `NOVAS-FUNCIONALIDADES.md`.
 - `.github/workflows/desktop.yml`: CI que testa e gera os instaladores (Windows .exe, Linux AppImage/.deb).
 
 ## Dados (pasta do usuário no desktop, raiz do repo em desenvolvimento)

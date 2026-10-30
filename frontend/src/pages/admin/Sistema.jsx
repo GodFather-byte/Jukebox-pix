@@ -115,6 +115,16 @@ export default function Sistema({ chamar, baixarArquivo }) {
             : 'Nenhum backup ainda.'}
         </Item>
 
+        <Item estado={!d.central?.configurada ? 'neutro' : d.central.ultimo_erro && (!d.central.ultimo_envio || d.central.ultimo_erro.em > d.central.ultimo_envio) ? 'erro' : 'ok'} titulo="Central (app de acompanhamento)">
+          {!d.central?.configurada
+            ? 'Não ligada. Para o dono e o parceiro acompanharem pelo celular, preencha o endereço da central e o token da máquina na tela de configuração (docs/CENTRAL.md).'
+            : d.central.ultimo_erro && (!d.central.ultimo_envio || d.central.ultimo_erro.em > d.central.ultimo_envio)
+              ? <>O último relatório não foi enviado ({new Date(d.central.ultimo_erro.em).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}): {d.central.ultimo_erro.motivo}. Tenta de novo sozinho a cada 6 h e em cada fechamento.</>
+              : d.central.ultimo_envio
+                ? <>Último relatório enviado: {new Date(d.central.ultimo_envio).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}. Manda a cada 6 h e em cada fechamento.</>
+                : 'Ligada. O primeiro relatório sai 1 minuto depois de a jukebox abrir.'}
+        </Item>
+
         <Item estado={!d.backup_copia ? 'atencao' : !d.backup_copia.acessivel || !d.backup_copia.em_dia ? 'erro' : 'ok'} titulo="Cópia extra do backup">
           {!d.backup_copia
             ? 'Não configurada. Os backups ficam só neste computador: defina BACKUP_COPIA_DIR no .env apontando para uma pasta da nuvem (OneDrive/Google Drive) ou um pendrive.'
