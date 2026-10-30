@@ -34,6 +34,9 @@ export const config = {
   musicasDir,
   // Pasta onde você solta Artista/CD/faixas para importar vários CDs de uma vez.
   importDir: env.IMPORT_DIR ? path.resolve(base, env.IMPORT_DIR) : path.join(musicasDir, '_importar'),
+  // Acervo de outra jukebox (ex.: o HD antigo ligado como segundo disco). Só leitura: as músicas tocam de lá,
+  // nada é movido, copiado ou apagado nessa pasta.
+  acervoExternoDir: env.ACERVO_EXTERNO_DIR?.trim() ? path.resolve(base, env.ACERVO_EXTERNO_DIR.trim()) : null,
   // Vinhetas de áudio e cartazes do monitor ficam dentro da pasta de músicas, em pastas com "_" (nunca viram CD).
   vinhetasDir: path.join(musicasDir, '_vinhetas'),
   cartazesDir: path.join(musicasDir, '_cartazes'),

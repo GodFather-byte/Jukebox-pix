@@ -128,6 +128,7 @@ async function salvar(evento) {
       token: $('token').value,
       terminal: modo() === 'producao' ? $('terminal').value : '',
       noteiroPorta: $('noteiro').value,
+      acervoExterno: $('acervoExterno').value,
       porta: Number($('porta').value),
       iniciarComSistema: $('iniciarComSistema').checked,
     });
@@ -147,6 +148,7 @@ async function iniciar() {
   $('terminal').value = dados.terminal;
   opcao($('noteiro'), dados.noteiroPorta);
   $('noteiro').value = dados.noteiroPorta;
+  $('acervoExterno').value = dados.acervoExterno;
   $('iniciarComSistema').checked = dados.iniciarComSistema;
   if (dados.temToken) $('token').placeholder = 'Já preenchido. Deixe em branco para manter.';
   if (dados.existe) $('subtitulo').textContent = 'As mudanças valem assim que o jukebox reiniciar.';

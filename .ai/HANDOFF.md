@@ -26,7 +26,11 @@ toque/botões físicos. Próxima meta do dono: **piloto na boate**.
   (o HD antigo fica guardado intacto). O acervo deles é MP3 comum em `~/musicas/ARTISTA - CD/NN - faixa.mp3`.
 - Importador aceita esse formato: pasta única "Artista - CD" (`separarArtista` em `backend/services/importacao.js`).
   Pastas só com clipes (.mpg/.mp4, ~15% do que toca lá) aparecem como ignoradas: vídeo ainda não é suportado.
-- A importação MOVE os arquivos: copie o acervo do HD antigo para a pasta de importar, nunca aponte para o HD original.
+- Modo "usar as músicas onde estão": `ACERVO_EXTERNO_DIR` (campo na tela de configuração do desktop) aponta para a
+  pasta de músicas do HD antigo; painel → Importar → "Acervo de outra jukebox" cadastra os CDs com caminho absoluto
+  (`criarCd({ manterNoLugar })`), só a capa é copiada. O player aceita arquivos dessa pasta (`resolverArquivo`) e
+  apagar o CD nunca apaga arquivo fora de `musicasDir`. A importação normal (pasta `_importar`) continua MOVENDO.
+- SO recomendado nas máquinas: Linux Mint 22 XFCE no SSD (o Linux da JukeLinux é de 2013, não roda o Electron).
 - Falta para o piloto nessas máquinas: ler o crédito do moedeiro/noteiro/chave de 20 deles (aguardando diagnóstico),
   modo aparelho + instalador por pendrive, tocar clipes, importar histórico de `tocados.txt`, fechamento com % do ponto.
 

@@ -68,7 +68,7 @@ function senhaAleatoria(tamanho = 14) {
 function lerConfiguracao(directory) {
   const file = path.join(directory, '.env');
   if (!fs.existsSync(file)) {
-    return { existe: false, modo: 'producao', nomeLocal: '', senha: senhaAleatoria(), porta: 3000, temToken: false, terminal: '', noteiroPorta: '', iniciarComSistema: true };
+    return { existe: false, modo: 'producao', nomeLocal: '', senha: senhaAleatoria(), porta: 3000, temToken: false, terminal: '', noteiroPorta: '', acervoExterno: '', iniciarComSistema: true };
   }
   const values = dotenv.parse(fs.readFileSync(file));
   return {
@@ -80,6 +80,7 @@ function lerConfiguracao(directory) {
     temToken: Boolean(values.MERCADOPAGO_ACCESS_TOKEN?.trim()),
     terminal: values.MERCADOPAGO_POINT_TERMINAL || '',
     noteiroPorta: values.NOTEIRO === 'serial' ? values.NOTEIRO_PORTA || '' : '',
+    acervoExterno: values.ACERVO_EXTERNO_DIR || '',
     iniciarComSistema: values.INICIAR_COM_SISTEMA === '1',
   };
 }
@@ -100,6 +101,10 @@ function salvarConfiguracao(directory, campos) {
   const noteiroPorta = String(campos.noteiroPorta ?? '').trim();
   if (/\s/.test(terminal) || terminal.length > 120) throw new Error('Maquininha inválida.');
   if (noteiroPorta.length > 120) throw new Error('Porta do noteiro inválida.');
+  const acervoExterno = String(campos.acervoExterno ?? '').trim();
+  if (acervoExterno && (!path.isAbsolute(acervoExterno) || /[\r\n]/.test(acervoExterno))) {
+    throw new Error('Pasta de músicas da outra jukebox: informe o caminho completo (ex.: /media/jukebox/HD/home/jkb/musicas).');
+  }
 
   const file = path.join(directory, '.env');
   const existia = fs.existsSync(file);
@@ -115,6 +120,7 @@ function salvarConfiguracao(directory, campos) {
     MERCADOPAGO_POINT_TERMINAL: terminal,
     NOTEIRO: noteiroPorta ? 'serial' : 'desligado',
     NOTEIRO_PORTA: noteiroPorta,
+    ACERVO_EXTERNO_DIR: acervoExterno,
     INICIAR_COM_SISTEMA: campos.iniciarComSistema ? '1' : '0',
   };
   if (token) valores.MERCADOPAGO_ACCESS_TOKEN = token;

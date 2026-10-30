@@ -95,8 +95,9 @@ function desfazerMovimentos(movimentos, pastasCriadas) {
  * faixas: [{ caminho, nomeOriginal, tituloManual? }]
  * status: 'novo' (fica em LANÇAMENTOS por LANCAMENTO_DIAS) ou 'lancado' (vai direto pra categoria)
  * preco:  créditos cobrados por música deste CD (padrão 1)
+ * manterNoLugar: as faixas tocam de onde estão (acervo de outra jukebox); só a capa é copiada.
  */
-export async function criarCd({ titulo, ano, categoriaId, artistaId, artistaNome, status = 'novo', preco = 1, capa = null, faixas, detalheLog }) {
+export async function criarCd({ titulo, ano, categoriaId, artistaId, artistaNome, status = 'novo', preco = 1, capa = null, faixas, detalheLog, manterNoLugar = false }) {
   const tituloLimpo = String(titulo ?? '').trim();
   if (!tituloLimpo) throw new ErroApi(400, 'Informe o título do CD');
   if (!faixas?.length) throw new ErroApi(400, 'Envie ao menos uma música');
@@ -117,22 +118,33 @@ export async function criarCd({ titulo, ano, categoriaId, artistaId, artistaNome
   const pasta = path.join(nomeSeguro(idArtista ?? artistaNome), `${nomeSeguro(tituloLimpo)}-${cdId.slice(0, 8)}`);
   const movimentos = [];
   const pastasCriadas = [];
+  let capaCopiada = null;
 
   try {
-    for (const dir of [path.join(config.musicasDir, path.dirname(pasta)), path.join(config.musicasDir, pasta)]) {
-      if (!fs.existsSync(dir)) pastasCriadas.push(dir);
-      fs.mkdirSync(dir, { recursive: true });
+    if (!manterNoLugar) {
+      for (const dir of [path.join(config.musicasDir, path.dirname(pasta)), path.join(config.musicasDir, pasta)]) {
+        if (!fs.existsSync(dir)) pastasCriadas.push(dir);
+        fs.mkdirSync(dir, { recursive: true });
+      }
     }
 
     let capaNome = null;
     if (capa) {
       capaNome = `${cdId}${path.extname(capa.nomeOriginal).toLowerCase()}`;
       const destino = path.join(capasDir, capaNome);
-      moverArquivo(capa.caminho, destino);
-      movimentos.push({ origem: capa.caminho, destino });
+      if (manterNoLugar) {
+        fs.copyFileSync(capa.caminho, destino);
+        capaCopiada = destino;
+      } else {
+        moverArquivo(capa.caminho, destino);
+        movimentos.push({ origem: capa.caminho, destino });
+      }
     }
 
     const musicas = lidas.map((faixa, i) => {
+      if (manterNoLugar) {
+        return { id: novoId(), titulo: faixa.titulo, duracao: faixa.duracao, arquivo: path.resolve(faixa.caminho).split(path.sep).join('/') };
+      }
       const extensao = path.extname(faixa.nomeOriginal).toLowerCase();
       const arquivo = path.join(pasta, `${String(i + 1).padStart(2, '0')}-${nomeSeguro(faixa.titulo)}${extensao}`);
       const destino = path.join(config.musicasDir, arquivo);
@@ -168,6 +180,7 @@ export async function criarCd({ titulo, ano, categoriaId, artistaId, artistaNome
     return { id: cdId, status: lancadoJa ? 'lancado' : 'novo', data_lancamento: dataLancamento, total_musicas: musicas.length };
   } catch (erro) {
     desfazerMovimentos(movimentos, pastasCriadas);
+    if (capaCopiada) apagarArquivo(capaCopiada);
     throw erro;
   }
 }

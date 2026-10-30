@@ -36,9 +36,11 @@ export function separarArtista(nome) {
  *   Artista - CD/faixas            (uma pasta só, como o acervo de outras jukeboxes)
  *   Artista/CD/faixas              (a categoria é escolhida na tela)
  *   Categoria/Artista/CD/faixas    (a categoria vem do nome da pasta)
+ * origem 'externo' procura em config.acervoExternoDir (acervo de outra jukebox, só leitura).
  * Só lista; nada é movido aqui.
  */
-export function escanear() {
+export function escanear(origem = 'importar') {
+  const raiz = pastaDaOrigem(origem);
   const cds = [];
   const ignorados = [];
   const titulosDoArtista = db.prepare('SELECT titulo FROM cds WHERE artista_id = ?');
@@ -84,16 +86,27 @@ export function escanear() {
     }
   }
 
-  andar(config.importDir, []);
+  andar(raiz, []);
   cds.sort((a, b) => natural(a.chave, b.chave));
   return { cds, ignorados };
 }
 
-// O que o navegador recebe: sem caminhos do disco.
-export function listar() {
-  const { cds, ignorados } = escanear();
+function pastaDaOrigem(origem) {
+  if (origem !== 'externo') return config.importDir;
+  if (!config.acervoExternoDir) throw new ErroApi(400, 'Nenhuma pasta de acervo de outra jukebox foi configurada.');
+  if (!fs.existsSync(config.acervoExternoDir)) {
+    throw new ErroApi(400, `Pasta do acervo não encontrada (${config.acervoExternoDir}). O HD está ligado?`);
+  }
+  return config.acervoExternoDir;
+}
+
+// O que o navegador recebe: sem caminhos do disco além da própria pasta procurada.
+export function listar(origem = 'importar') {
+  const { cds, ignorados } = escanear(origem);
   return {
-    pasta: config.importDir,
+    origem: origem === 'externo' ? 'externo' : 'importar',
+    externo_configurado: Boolean(config.acervoExternoDir),
+    pasta: pastaDaOrigem(origem),
     cds: cds.map((cd) => ({
       chave: cd.chave,
       categoria_pasta: cd.categoriaPasta,
@@ -131,12 +144,14 @@ function limparPastasVazias(dir, ehRaiz = true) {
  * Importa os CDs escolhidos. As chaves vêm do navegador, mas só valem se baterem com uma pasta
  * que o escaneamento acabou de achar: nenhum caminho do cliente é usado no disco.
  * Cada CD é independente: um que falha não derruba os outros (e seus arquivos ficam onde estavam).
+ * Do acervo externo, as faixas ficam onde estão e só o cadastro é criado.
  */
-export async function importar({ chaves, categoriaId, status, preco = 1 }) {
+export async function importar({ chaves, categoriaId, status, preco = 1, origem = 'importar' }) {
+  const externo = origem === 'externo';
   if (!Array.isArray(chaves) || !chaves.length) throw new ErroApi(400, 'Selecione ao menos um CD.');
   validarPreco(preco); // erro de preço vale para o lote todo, antes de mover qualquer arquivo
 
-  const porChave = new Map(escanear().cds.map((cd) => [cd.chave, cd]));
+  const porChave = new Map(escanear(externo ? 'externo' : 'importar').cds.map((cd) => [cd.chave, cd]));
   const importados = [];
   const erros = [];
 
@@ -156,7 +171,8 @@ export async function importar({ chaves, categoriaId, status, preco = 1 }) {
         preco,
         capa: cd.capa ? { caminho: path.join(cd.dir, cd.capa), nomeOriginal: cd.capa } : null,
         faixas: cd.audios.map((nome) => ({ caminho: path.join(cd.dir, nome), nomeOriginal: nome })),
-        detalheLog: `importação em lote (${cd.audios.length} música(s))`,
+        detalheLog: `${externo ? 'acervo de outra jukebox, tocando de onde está' : 'importação em lote'} (${cd.audios.length} música(s))`,
+        manterNoLugar: externo,
       });
       importados.push({ chave, ...resultado });
     } catch (erro) {
@@ -165,6 +181,6 @@ export async function importar({ chaves, categoriaId, status, preco = 1 }) {
     }
   }
 
-  limparPastasVazias(config.importDir);
+  if (!externo) limparPastasVazias(config.importDir);
   return { importados, erros };
 }
