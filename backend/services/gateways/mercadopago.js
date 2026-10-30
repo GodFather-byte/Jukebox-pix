@@ -1,9 +1,40 @@
 import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
 import { config } from '../../config.js';
 import { ErroApi } from '../../erros.js';
 
 const API = 'https://api.mercadopago.com';
 const cfg = config.pagamento.mercadopago;
+
+// No aplicativo desktop a saída do servidor é descartada: a resposta do Mercado Pago também vai para
+// logs/mercadopago.log na pasta de dados (só o que o Mercado Pago devolveu; o token nunca entra aqui).
+const LOG = path.join(process.env.JUKEBOX_DATA_DIR || process.cwd(), 'logs', 'mercadopago.log');
+
+// Causas mais comuns, em português para o dono resolver sozinho (códigos da API de pagamentos do Mercado Pago).
+const MOTIVOS = {
+  13253: 'a conta do Mercado Pago não tem chave Pix cadastrada (app Mercado Pago → Pix → Minhas chaves)',
+  4050: 'o e-mail do pagador foi recusado pelo Mercado Pago (troque MERCADOPAGO_EMAIL_PAGADOR na configuração avançada)',
+  7: 'o Access Token não está liberado para receber pagamentos reais (ative as credenciais de produção)',
+  401: 'o Access Token é inválido ou foi renovado: cole o token novo nas Configurações',
+};
+
+export function motivoDaRecusa(status, dados) {
+  const causas = Array.isArray(dados?.cause) ? dados.cause : [];
+  for (const causa of causas) if (MOTIVOS[causa?.code]) return MOTIVOS[causa.code];
+  if (status === 401) return MOTIVOS[401];
+  const texto = causas.find((c) => c?.description)?.description || dados?.message;
+  return texto ? String(texto).replace(/\s+/g, ' ').slice(0, 160) : null;
+}
+
+function registrar(rota, status, dados) {
+  try {
+    fs.mkdirSync(path.dirname(LOG), { recursive: true, mode: 0o700 });
+    if (fs.existsSync(LOG) && fs.statSync(LOG).size > 256 * 1024) fs.renameSync(LOG, `${LOG}.old`);
+    const linha = { quando: new Date().toISOString(), rota: rota.split('?')[0], status, resposta: dados };
+    fs.appendFileSync(LOG, `${JSON.stringify(linha)}\n`, { mode: 0o600 });
+  } catch { /* o log é ajuda; nunca derruba a cobrança */ }
+}
 
 export async function chamar(rota, { metodo = 'GET', corpo, idempotencia } = {}) {
   if (!cfg.token) throw new ErroApi(500, 'MERCADOPAGO_ACCESS_TOKEN não configurado');
@@ -28,7 +59,9 @@ export async function chamar(rota, { metodo = 'GET', corpo, idempotencia } = {})
   const dados = await resposta.json().catch(() => ({}));
   if (!resposta.ok) {
     console.error('[mercadopago]', resposta.status, JSON.stringify(dados));
-    throw new ErroApi(502, 'O provedor de pagamento recusou a cobrança.');
+    registrar(rota, resposta.status, dados);
+    const motivo = motivoDaRecusa(resposta.status, dados);
+    throw new ErroApi(502, `O provedor de pagamento recusou a cobrança${motivo ? `: ${motivo}` : ''}.`);
   }
   return dados;
 }
@@ -63,7 +96,7 @@ export const mercadopago = {
         transaction_amount: valor,
         description: descricao,
         payment_method_id: 'pix',
-        payer: { email: 'cliente@jukebox.local' },
+        payer: { email: cfg.emailPagador },
         external_reference: referencia,
         date_of_expiration: comOffsetBrasilia(expiraEm),
         ...(cfg.urlWebhook && { notification_url: `${cfg.urlWebhook.replace(/\/$/, '')}/api/pagamento/webhook` }),
