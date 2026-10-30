@@ -23,6 +23,39 @@ function separarAno(nome) {
   return { ano: null, titulo: nome.trim() };
 }
 
+// A JukeLinux guarda o ritmo de cada CD num genero.txt dentro da pasta do CD (primeira linha, ex.: "SERTANEJO").
+// Os arquivos antigos são Latin-1; os novos podem ser UTF-8. "Lançamentos" e "50+ tocados" são listas da
+// própria JukeLinux, não ritmos: ficam de fora e o CD cai na categoria escolhida na tela.
+const LISTAS_DA_JUKELINUX = /^(lancamentos?|50-?mais-?tocad[ao]s|50-?tocad[ao]s|mais-?tocad[ao]s)$/;
+
+export function lerGenero(dir, entradas) {
+  const arquivo = entradas.find((e) => e.isFile() && e.name.toLowerCase() === 'genero.txt');
+  if (!arquivo) return null;
+  let bytes;
+  try {
+    bytes = fs.readFileSync(path.join(dir, arquivo.name));
+  } catch {
+    return null;
+  }
+  let texto;
+  try {
+    texto = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+  } catch {
+    texto = bytes.toString('latin1');
+  }
+  const genero = texto.replace(/^﻿/, '').split(/\r?\n/).map((linha) => linha.trim()).find(Boolean)?.slice(0, 40) ?? '';
+  const id = slug(genero.replace(/\+/g, ' mais '));
+  if (!id || LISTAS_DA_JUKELINUX.test(id)) return null;
+  return genero;
+}
+
+// "SERTANEJO RAIZ" vira "Sertanejo Raiz" no nome da categoria nova (o id continua sendo o slug).
+const nomeDeCategoria = (texto) => {
+  const limpo = texto.trim().replace(/\s+/g, ' ');
+  if (limpo !== limpo.toUpperCase()) return limpo;
+  return limpo.toLowerCase().replace(/(^|[\s/-])(\p{L})/gu, (_, antes, letra) => antes + letra.toUpperCase());
+};
+
 // Pasta única no formato de outras jukeboxes: "ARTISTA - CD 1" vira artista + CD.
 // Sem " - " no nome (ex.: "Coletanea Funk 4"), o nome da pasta vale para os dois.
 export function separarArtista(nome) {
@@ -61,8 +94,9 @@ export function escanear(origem = 'importar') {
     const imagens = entradas.filter((e) => e.isFile() && EXT_IMAGEM.has(extensao(e.name))).map((e) => e.name).sort(natural);
     const capa = imagens.find((nome) => NOMES_DE_CAPA.includes(path.parse(nome).name.toLowerCase())) ?? imagens[0] ?? null;
     const jaExiste = titulosDoArtista.all(slug(artista)).some((cd) => slug(cd.titulo) === slug(titulo));
+    const genero = lerGenero(dir, entradas);
 
-    cds.push({ chave: segmentos.join('/'), dir, categoriaPasta, artista, titulo, ano, audios, capa, jaExiste });
+    cds.push({ chave: segmentos.join('/'), dir, categoriaPasta, genero, artista, titulo, ano, audios, capa, jaExiste });
   }
 
   function andar(dir, segmentos) {
@@ -110,6 +144,7 @@ export function listar(origem = 'importar') {
     cds: cds.map((cd) => ({
       chave: cd.chave,
       categoria_pasta: cd.categoriaPasta,
+      genero: cd.genero,
       artista: cd.artista,
       titulo: cd.titulo,
       ano: cd.ano,
@@ -121,13 +156,14 @@ export function listar(origem = 'importar') {
   };
 }
 
+// Usa a categoria que já existe com o mesmo nome (sem acento/maiúscula: "Forró" = "FORRO") ou cria uma nova.
 function garantirCategoria(nome) {
   const id = slug(nome);
   if (!id) throw new ErroApi(400, 'Nome de categoria inválido na pasta');
-  if (!db.prepare('SELECT 1 FROM categorias WHERE id = ?').get(id)) {
-    const { total } = db.prepare('SELECT COUNT(*) AS total FROM categorias').get();
-    db.prepare('INSERT INTO categorias (id, nome, icone, cor) VALUES (?, ?, ?, ?)').run(id, nome.trim(), '🎵', CORES[total % CORES.length]);
-  }
+  const existente = db.prepare('SELECT id, nome FROM categorias').all().find((c) => c.id === id || slug(c.nome) === id);
+  if (existente) return existente.id;
+  const { total } = db.prepare('SELECT COUNT(*) AS total FROM categorias').get();
+  db.prepare('INSERT INTO categorias (id, nome, icone, cor) VALUES (?, ?, ?, ?)').run(id, nomeDeCategoria(nome), '🎵', CORES[total % CORES.length]);
   return id;
 }
 
@@ -159,13 +195,15 @@ export async function importar({ chaves, categoriaId, status, preco = 1, origem 
     const cd = porChave.get(chave);
     if (!cd) { erros.push({ chave, erro: 'Pasta não encontrada (talvez já tenha sido importada).' }); continue; }
     if (cd.jaExiste) { erros.push({ chave, erro: 'Já existe um CD com esse nome para este artista.' }); continue; }
-    if (!cd.categoriaPasta && !categoriaId) { erros.push({ chave, erro: 'Escolha a categoria dos CDs.' }); continue; }
+    // Categoria: a da pasta (Categoria/Artista/CD), senão o ritmo do genero.txt, senão a escolhida na tela.
+    const categoriaDoCd = cd.categoriaPasta ?? cd.genero;
+    if (!categoriaDoCd && !categoriaId) { erros.push({ chave, erro: 'Escolha a categoria dos CDs.' }); continue; }
 
     try {
       const resultado = await criarCd({
         titulo: cd.titulo,
         ano: cd.ano,
-        categoriaId: cd.categoriaPasta ? garantirCategoria(cd.categoriaPasta) : categoriaId,
+        categoriaId: categoriaDoCd ? garantirCategoria(categoriaDoCd) : categoriaId,
         artistaNome: cd.artista,
         status,
         preco,
