@@ -1,5 +1,9 @@
 import { useEffect, useState } from 'react';
 
+// Acervos de jukebox antiga têm milhares de CDs: cada pedido leva só um lote, para nenhum passar do tempo
+// limite do servidor e a tela mostrar o andamento.
+const CDS_POR_LOTE = 15;
+
 export default function Importar({ chamar, aoImportar }) {
   const [varredura, setVarredura] = useState(null);
   const [categorias, setCategorias] = useState([]);
@@ -9,6 +13,7 @@ export default function Importar({ chamar, aoImportar }) {
   const [preco, setPreco] = useState('1');
   const [carregando, setCarregando] = useState(false);
   const [importando, setImportando] = useState(false);
+  const [progresso, setProgresso] = useState(null);
   const [resultado, setResultado] = useState(null);
   const [erro, setErro] = useState('');
   const [origem, setOrigem] = useState('importar');
@@ -45,19 +50,35 @@ export default function Importar({ chamar, aoImportar }) {
   });
 
   const selecionaveis = varredura?.cds.filter((cd) => !cd.ja_existe) ?? [];
-  const precisaCategoria = varredura?.cds.some((cd) => marcados.has(cd.chave) && !cd.categoria_pasta);
+  const precisaCategoria = varredura?.cds.some((cd) => marcados.has(cd.chave) && !cd.categoria_pasta && !cd.genero);
   const totalFaixas = varredura?.cds.filter((cd) => marcados.has(cd.chave)).reduce((t, cd) => t + cd.faixas, 0) ?? 0;
+  const comGenero = varredura?.cds.filter((cd) => cd.genero).length ?? 0;
+  const ritmos = new Set(varredura?.cds.map((cd) => cd.genero).filter(Boolean));
 
   async function importar() {
     setErro('');
     setImportando(true);
+    const chaves = [...marcados];
+    const total = { importados: [], erros: [] };
+    setProgresso({ feitos: 0, total: chaves.length });
     try {
-      const r = await chamar('/admin/importacao', {
-        metodo: 'POST',
-        corpo: { chaves: [...marcados], categoria_id: categoriaId, status, preco: Number(preco || 1), origem },
-      });
-      setResultado(r);
-      if (r.importados.length) aoImportar();
+      for (let i = 0; i < chaves.length; i += CDS_POR_LOTE) {
+        const lote = chaves.slice(i, i + CDS_POR_LOTE);
+        try {
+          const r = await chamar('/admin/importacao', {
+            metodo: 'POST',
+            corpo: { chaves: lote, categoria_id: categoriaId, status, preco: Number(preco || 1), origem },
+          });
+          total.importados.push(...r.importados);
+          total.erros.push(...r.erros);
+        } catch (e) {
+          // Um lote que falha (rede, servidor reiniciando) não para os outros: os CDs dele aparecem como erro.
+          total.erros.push(...lote.map((chave) => ({ chave, erro: e.message })));
+        }
+        setProgresso({ feitos: Math.min(i + lote.length, chaves.length), total: chaves.length });
+      }
+      setResultado(total);
+      if (total.importados.length) aoImportar();
       const dados = await chamar(`/admin/importacao?origem=${origem}`);
       setVarredura(dados);
       setMarcados(new Set());
@@ -65,6 +86,7 @@ export default function Importar({ chamar, aoImportar }) {
       setErro(e.message);
     } finally {
       setImportando(false);
+      setProgresso(null);
     }
   }
 
@@ -77,7 +99,8 @@ export default function Importar({ chamar, aoImportar }) {
       </p>
       <p className="nota">
         <b>Acervo de outra jukebox:</b> com o HD da máquina antiga ligado e a pasta dele informada na configuração
-        do aplicativo, as músicas tocam direto de lá. Nada é movido, copiado ou apagado nesse HD.
+        do aplicativo, as músicas tocam direto de lá. Nada é movido, copiado ou apagado nesse HD. CDs da JukeLinux
+        já vêm com o ritmo (arquivo genero.txt da pasta): é só deixar todos marcados e importar de uma vez.
       </p>
       <code className="importar-pasta">{varredura?.pasta ?? 'musicas\\_importar'}</code>
       <pre className="importar-exemplo">{`Artista - CD/01 - Faixa.mp3          (acervo de outra jukebox; categoria aqui na tela)
@@ -114,6 +137,12 @@ Uma imagem na pasta do CD (capa.jpg, cover.jpg...) vira a capa.`}</pre>
                 </label>
                 <span>{varredura.cds.length} CD(s) encontrado(s)</span>
               </div>
+              {comGenero > 0 && (
+                <p className="aviso aviso-ok importar-espaco">
+                  🎵 {comGenero} de {varredura.cds.length} CD(s) já têm ritmo da JukeLinux ({ritmos.size} ritmo(s)).
+                  Eles entram cada um no seu ritmo; a categoria não existe? É criada sozinha.
+                </p>
+              )}
 
               <ul className="importar-lista">
                 {varredura.cds.map((cd) => (
@@ -126,6 +155,7 @@ Uma imagem na pasta do CD (capa.jpg, cover.jpg...) vira a capa.`}</pre>
                       </span>
                     </label>
                     {cd.categoria_pasta && <span className="selo selo-ciano">categoria: {cd.categoria_pasta}</span>}
+                    {!cd.categoria_pasta && cd.genero && <span className="selo selo-ciano">ritmo: {cd.genero}</span>}
                     {cd.ja_existe && <span className="selo selo-rosa">já existe</span>}
                   </li>
                 ))}
@@ -137,7 +167,7 @@ Uma imagem na pasta do CD (capa.jpg, cover.jpg...) vira a capa.`}</pre>
 
               <div className="admin-form importar-opcoes">
                 {precisaCategoria && (
-                  <label>Categoria dos CDs sem categoria na pasta
+                  <label>Categoria dos CDs sem ritmo nem categoria na pasta
                     <select className="campo" value={categoriaId} onChange={(e) => setCategoriaId(e.target.value)}>
                       {categorias.map((c) => <option key={c.id} value={c.id}>{c.icone} {c.nome}</option>)}
                     </select>
@@ -153,8 +183,13 @@ Uma imagem na pasta do CD (capa.jpg, cover.jpg...) vira a capa.`}</pre>
                   <input className="campo mono" inputMode="numeric" value={preco} onChange={(e) => setPreco(e.target.value.replace(/\D/g, '').slice(0, 2))} />
                 </label>
                 <button className="btn btn-grande" onClick={importar} disabled={importando || marcados.size === 0}>
-                  {importando ? 'IMPORTANDO… (pode demorar)' : `IMPORTAR ${marcados.size} CD${marcados.size === 1 ? '' : 'S'} (${totalFaixas} músicas)`}
+                  {importando
+                    ? `IMPORTANDO… ${progresso ? `${progresso.feitos} de ${progresso.total} CDs` : ''}`
+                    : `IMPORTAR ${marcados.size} CD${marcados.size === 1 ? '' : 'S'} (${totalFaixas} músicas)`}
                 </button>
+                {importando && progresso && (
+                  <progress className="importar-progresso" value={progresso.feitos} max={progresso.total} />
+                )}
               </div>
             </>
           )}

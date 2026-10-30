@@ -129,6 +129,47 @@ test('acervo de outra jukebox: cadastra sem mover, copiar ou apagar nada do HD',
   assert.deepEqual(fs.readdirSync(path.join(hd, 'Henrique e Juliano - Manifesto Musical')).sort(), antes, 'o HD fica intacto');
 });
 
+test('acervo da JukeLinux: o genero.txt de cada CD vira a categoria, e tudo entra de uma vez', (t) => {
+  const dados = pastaDeDados(t);
+  const hd = path.join(dados, 'hd-antigo', 'musicas');
+  criar(hd, 'Henrique e Juliano - Manifesto Musical/08 - Rasteira.mp3');
+  fs.writeFileSync(path.join(hd, 'Henrique e Juliano - Manifesto Musical', 'genero.txt'), 'SERTANEJO\r\n');
+  criar(hd, 'Calcinha Preta - Ao Vivo/01 - Você Não Vale Nada.mp3');
+  fs.writeFileSync(path.join(hd, 'Calcinha Preta - Ao Vivo', 'GENERO.TXT'), Buffer.from('FORR\xd3\n', 'latin1')); // arquivo antigo, Latin-1
+  criar(hd, 'Zeca Pagodinho - Ao Vivo/01 - Deixa a Vida Me Levar.mp3');
+  fs.writeFileSync(path.join(hd, 'Zeca Pagodinho - Ao Vivo', 'genero.txt'), 'SAMBA/PAGODE');
+  criar(hd, 'Coletanea 2018/01 - Faixa.mp3');
+  fs.writeFileSync(path.join(hd, 'Coletanea 2018', 'genero.txt'), Buffer.from('LAN\xc7AMENTOS\n', 'latin1'));
+  criar(hd, 'Sem Ritmo - CD/01 - Faixa.mp3');
+
+  const resultado = executar(`
+    import { db } from './backend/database.js';
+    import { importar, listar } from './backend/services/importacao.js';
+    db.prepare('INSERT INTO categorias (id, nome, icone, cor) VALUES (?, ?, ?, ?)').run('forro', 'Forró', '🪗', '#F5B700');
+    db.prepare('INSERT INTO categorias (id, nome, icone, cor) VALUES (?, ?, ?, ?)').run('variados', 'Variados', '🎵', '#00D4FF');
+    const lista = listar('externo');
+    const r = await importar({ chaves: lista.cds.map((cd) => cd.chave), categoriaId: 'variados', status: 'lancado', origem: 'externo' });
+    const cds = db.prepare('SELECT cds.titulo, cds.categoria_id AS categoria FROM cds ORDER BY cds.titulo').all();
+    const categorias = db.prepare('SELECT id, nome FROM categorias ORDER BY id').all();
+    console.log(JSON.stringify({ generos: Object.fromEntries(lista.cds.map((cd) => [cd.chave, cd.genero])), erros: r.erros, cds, categorias }));
+  `, { JUKEBOX_DATA_DIR: dados, ACERVO_EXTERNO_DIR: hd });
+
+  assert.equal(resultado.status, 0, resultado.stderr);
+  const saida = JSON.parse(resultado.stdout.trim().split('\n').at(-1));
+  assert.deepEqual(saida.generos, {
+    'Calcinha Preta - Ao Vivo': 'FORRÓ',
+    'Coletanea 2018': null,
+    'Henrique e Juliano - Manifesto Musical': 'SERTANEJO',
+    'Sem Ritmo - CD': null,
+    'Zeca Pagodinho - Ao Vivo': 'SAMBA/PAGODE',
+  }, 'Latin-1 e UTF-8 lidos; "Lançamentos" é lista da JukeLinux, não ritmo');
+  assert.deepEqual(saida.erros, []);
+  assert.deepEqual(saida.cds.map((cd) => cd.categoria).sort(), ['forro', 'samba-pagode', 'sertanejo', 'variados', 'variados']);
+  assert.equal(saida.categorias.filter((c) => c.id === 'forro').length, 1, 'FORRÓ usa a categoria Forró que já existia');
+  assert.deepEqual(saida.categorias.find((c) => c.id === 'samba-pagode'), { id: 'samba-pagode', nome: 'Samba/Pagode' });
+  assert.deepEqual(saida.categorias.find((c) => c.id === 'sertanejo'), { id: 'sertanejo', nome: 'Sertanejo' });
+});
+
 test('acervo de outra jukebox sem pasta configurada ou com o HD desligado avisa o dono', (t) => {
   const dados = pastaDeDados(t);
   const codigo = `

@@ -205,11 +205,18 @@ Para mudar, edite o `.env` (menu **Jukebox Pix → Editar configuração avança
 ### Importar o acervo da JukeLinux (sem mover nada do HD)
 1. ☐ Aba **📥 Importar** → botão **💽 ACERVO DE OUTRA JUKEBOX**.
 2. ☐ Aparece a lista de CDs encontrados no HD. Cada pasta "ARTISTA - CD" vira um CD: o artista é o que vem antes
-   do primeiro " - ".
-3. ☐ **Desmarque tudo** (tire o ✓ de **Selecionar todos**) e **marque os CDs de um ritmo só** (ex.: todos de funk).
-4. ☐ Escolha a **categoria** (Funk), **Entram como: Direto na categoria (acervo antigo)** e **preço 1**.
-5. ☐ Clique em **IMPORTAR**. CDs grandes demoram alguns segundos cada.
-6. ☐ Repita para cada ritmo (Sertanejo, Pagode, Forró, Arrocha…).
+   do primeiro " - ". Ao lado de cada CD aparece o **ritmo** que a JukeLinux usava (arquivo `genero.txt` da pasta),
+   e no alto: "🎵 N CDs já têm ritmo da JukeLinux".
+3. ☐ Deixe **Selecionar todos** marcado. Cada CD entra no ritmo dele; ritmo que ainda não existe vira categoria
+   sozinho ("SERTANEJO RAIZ" vira "Sertanejo Raiz"; "FORRÓ" usa a categoria Forró se ela já existir).
+4. ☐ Em **Categoria dos CDs sem ritmo nem categoria na pasta**, escolha onde ficam os que não têm `genero.txt`
+   (ex.: crie antes uma categoria "Variados" na aba **🏷 Cadastros**). Os que a JukeLinux marcava como
+   "Lançamentos" também vão para ela.
+5. ☐ **Entram como: Direto na categoria (acervo antigo)** e **preço 1**.
+6. ☐ Clique em **IMPORTAR**. A tela importa em lotes e mostra "IMPORTANDO… 120 de 900 CDs". Um acervo grande leva
+   de 10 a 40 minutos (as músicas são lidas do HD antigo); pode deixar rodando. No fim aparece quantos entraram e a
+   lista de qualquer CD que deu erro (os outros continuam).
+7. ☐ Se algum CD caiu no ritmo errado, mude depois em **💿 Biblioteca** (editar o CD → categoria).
 
 > As músicas **tocam direto do HD da JukeLinux**: nada é movido, copiado ou apagado lá. Só a capa (se houver) é
 > copiada. Se o HD for desligado, essas músicas param de tocar até ele voltar.
@@ -217,6 +224,10 @@ Para mudar, edite o `.env` (menu **Jukebox Pix → Editar configuração avança
 > Pastas que só têm clipes (.mpg/.mp4) aparecem como "ignoradas": o Jukebox Pix toca só áudio.
 
 Para criar uma categoria que não existe: aba **🏷 Cadastros**.
+
+> **Dica: importe antes de colar o token.** Se o Access Token ainda não estiver à mão, escolha **Só experimentar**
+> na tela de configuração, importe as músicas e teste os botões. Depois volte em **Alt → Jukebox Pix →
+> Configurações…**, escolha **Atender clientes** e cole o token: os CDs importados continuam lá.
 
 ---
 
