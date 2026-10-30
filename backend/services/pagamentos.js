@@ -37,6 +37,20 @@ export async function iniciar({ valor, sessionId, metodo = 'pix', tipoCartao = '
     throw new ErroApi(400, `Informe um valor inteiro entre R$ ${config.valorMin} e R$ ${config.valorMax}.`);
   }
 
+  // Limite da máquina por tempo (ex.: R$ 100 a cada 30 min): quem bebeu demais não fica pagando sem parar.
+  // Conta só o que foi pago de fato (QR abandonado não trava ninguém), por Pix ou cartão.
+  const limite30 = configuracoes.lerRegras().limite_30min;
+  if (limite30 > 0) {
+    const desde = new Date(Date.now() - 30 * 60_000).toISOString();
+    const { total } = db.prepare(`
+      SELECT COALESCE(SUM(valor), 0) AS total FROM pagamentos
+       WHERE metodo IN ('pix', 'cartao') AND status = 'confirmado' AND confirmado_em >= ?
+    `).get(desde);
+    if (total + valor > limite30) {
+      throw new ErroApi(429, `Limite de R$ ${limite30} a cada 30 minutos nesta máquina. Tente de novo mais tarde ou use dinheiro.`, 'LIMITE_PERIODO');
+    }
+  }
+
   let sessao = sessionId ? obterSessao(sessionId) : null;
   if (sessionId && !sessao) throw new ErroApi(404, 'Sessão não encontrada');
   sessao ??= criarSessao();

@@ -79,7 +79,8 @@ const volumeDe = (automatica) => (automatica
 
 function argumentos(arquivo, ipc, ganho = 0, automatica = false) {
   const volume = volumeDe(automatica);
-  return backend.tipo === 'mpv' ? argumentosMpv(arquivo, { volume, ipc, ganho }) : argumentosVlc(arquivo, { volume, ganho });
+  const duracao = automatica ? configuracoes.automaticoTrechoSeg() : 0; // palhinha: só um trecho de graça
+  return backend.tipo === 'mpv' ? argumentosMpv(arquivo, { volume, ipc, ganho, duracao }) : argumentosVlc(arquivo, { volume, ganho, duracao });
 }
 
 // Só toca arquivos dentro da pasta de músicas ou do acervo de outra jukebox (o caminho vem do banco).
@@ -165,9 +166,11 @@ function terminarVinheta() {
 
 function tocar(item) {
   const simulado = backend.tipo === 'sim';
+  const trecho = item.session_id === SESSAO_SISTEMA ? configuracoes.automaticoTrechoSeg() : 0; // palhinha
+  const inteira = item.duracao ?? 180;
   const segundos = simulado
     ? Math.min(item.duracao ?? config.player.simSegundos, config.player.simSegundos)
-    : (item.duracao ?? 180);
+    : (trecho > 0 ? Math.min(trecho, inteira) : inteira);
 
   recentes = [...recentes, item.musica_id].slice(-RECENTES_MAX);
   desdeVinheta += 1;

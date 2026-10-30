@@ -47,7 +47,13 @@ toque/botões físicos. Próxima meta do dono: **piloto na boate**.
 
 - Limite por compra de Pix/cartão: R$ 10 a R$ 50 por padrão (`VALOR_MIN`, `VALOR_MAX` em `backend/config.js`);
   os botões de valor da tela (`config.valoresPix`) saem dessa faixa. Noteiro sem limite.
-- Ideia aprovada para depois: central na nuvem + app PWA para o parceiro e os pontos (relatório a cada 6 h).
+- Melhorias na máquina: palhinha (`automatico_trecho_seg`, mpv `--length`/vlc `--stop-time`), sorteio de crédito
+  (`sorteio_a_cada` em Regras; `fila.adicionar` devolve `premio`), limite R$/30 min (`limite_30min`, só pagamentos
+  confirmados), "tocar a seguir" na máquina (`Escolha.jsx`, quando a prioridade está ligada), alerta `credito`
+  (`CREDITO_ALERTA_10MIN`, não bloqueia) e modo aparelho no desktop (servidor caído reabre o app; tela travada recarrega).
+- Guia de instalação para o dono: `docs/GUIA-INSTALACAO.md` (do SSD vazio ao teste final).
+- Próxima etapa aprovada: central na nuvem + app PWA (parceiro e pontos, relatório a cada 6 h), licença por máquina,
+  pacotes de músicas e atualização à distância. Repositório separado.
 
 ## Próximos passos
 1. Dono testar o instalador do CI (Actions → Desktop → Artifacts) no computador da boate, primeiro em

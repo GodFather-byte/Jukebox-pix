@@ -6,6 +6,9 @@ Jukebox digital para boates, em aplicativo de Windows e Linux. **Tudo acontece n
 
 ### Instalação e primeiro uso
 
+> **Instalando numa jukebox de bar (inclusive trocando uma JukeLinux)?** Siga o passo a passo completo, com
+> checklist e problemas comuns: [docs/GUIA-INSTALACAO.md](docs/GUIA-INSTALACAO.md).
+
 Baixe o instalador `.exe` (Windows) ou `.AppImage`/`.deb` (Linux) em **Releases**. Em builds manuais ou de pull request, abra **Actions → Desktop → execução → Artifacts**, baixe e extraia o arquivo da sua plataforma. Artefatos de PR são builds de teste: confira a origem antes de executá-los. **Node.js só é necessário para desenvolvimento**, não para usar o aplicativo empacotado.
 
 - **Windows:** execute o instalador e abra **Jukebox Pix** pelo atalho criado pelo instalador. O executável não tem assinatura digital; o Windows/SmartScreen pode exibir um aviso de editor desconhecido. Não desative as proteções do sistema: use apenas arquivos de origem verificada.

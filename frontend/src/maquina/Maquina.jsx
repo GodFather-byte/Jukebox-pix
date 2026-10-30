@@ -5,6 +5,7 @@ import { api, formatarDuracao } from '../api.js';
 import { SessaoProvider, useSessao } from '../context/Sessao.jsx';
 import { useAgora, useApi, useManterAceso } from '../hooks.js';
 import Busca from './Busca.jsx';
+import Escolha from './Escolha.jsx';
 import Menu from './Menu.jsx';
 import Pagamento from './Pagamento.jsx';
 import { botaoDaTecla, ehTeclaDeCredito } from './teclas.js';
@@ -65,7 +66,7 @@ function Topo({ nome }) {
             <Capa capa={atual.musica.capa} icone={atual.musica.icone} cor={atual.musica.cor} titulo={atual.musica.cd} className="pn-tocando-capa" />
             <div className="pn-tocando-texto">
               {atual.automatica
-                ? <small className="pn-gratis">🎲 TOCANDO DE GRAÇA · ESCOLHA A PRÓXIMA!</small>
+                ? <small className="pn-gratis">{atual.trecho_seg ? '🎲 TRECHO GRÁTIS · COLOQUE CRÉDITO E OUÇA INTEIRA!' : '🎲 TOCANDO DE GRAÇA · ESCOLHA A PRÓXIMA!'}</small>
                 : <small>TOCANDO AGORA</small>}
               <b>{atual.musica.titulo}</b>
               <span>{atual.musica.artista}</span>
@@ -97,7 +98,8 @@ function Tela() {
   const [cdIdx, setCdIdx] = useState(0);
   const [faixaIdx, setFaixaIdx] = useState(0);
   const [faixas, setFaixas] = useState({});
-  const [janela, setJanela] = useState(null); // null | 'creditos' | 'buscar' | 'menu'
+  const [janela, setJanela] = useState(null); // null | 'creditos' | 'buscar' | 'menu' | 'escolha'
+  const [escolhendo, setEscolhendo] = useState(null); // música esperando "fila normal ou tocar a seguir"
   const [aviso, setAviso] = useState(null);
   const controleJanela = useRef(null);
   const faixaRitmos = useRef(null);
@@ -162,16 +164,22 @@ function Tela() {
     setFaixaIdx(0);
   }, [ritmos, ritmoIdx]);
 
-  const tocar = useCallback(async (musica) => {
-    if (!musica) return;
+  const enfileirar = useCallback(async (musica, prioridade = false) => {
     try {
-      await adicionarMusica(musica);
-      avisar(`♪ NA FILA: ${musica.titulo.toUpperCase()}`);
+      const r = await adicionarMusica(musica, { prioridade });
+      avisar(r.premio ? '🎉 VOCÊ GANHOU 1 CRÉDITO NO SORTEIO! ESCOLHA MAIS UMA'
+        : `${prioridade ? '⚡ TOCA A SEGUIR' : '♪ NA FILA'}: ${musica.titulo.toUpperCase()}`);
     } catch (erro) {
       if (erro.codigo === 'SALDO_INSUFICIENTE') avisar('COLOQUE CRÉDITOS PARA TOCAR', 'erro', true);
       else avisar(erro.message.toUpperCase(), 'erro');
     }
   }, [adicionarMusica, avisar]);
+
+  // Com "furar a fila" ligado no painel, o TOCAR pergunta antes; sem ele, vai direto para a fila.
+  const tocar = useCallback((musica) => {
+    if (!musica) return;
+    if (config.prioridade.ativa) { setEscolhendo(musica); setJanela('escolha'); } else enfileirar(musica);
+  }, [config.prioridade.ativa, enfileirar]);
 
   const apertar = useCallback((botao) => {
     if (botao === 'menu' && janela !== 'menu') { setJanela('menu'); return undefined; } // o operador abre de qualquer tela
@@ -287,6 +295,10 @@ function Tela() {
 
       {aviso && <div className={`pn-aviso ${aviso.tipo}`} key={aviso.id} role="status">{aviso.texto}</div>}
       {janela === 'creditos' && <Pagamento controle={controleJanela} aoFechar={() => setJanela(null)} />}
+      {janela === 'escolha' && escolhendo && (
+        <Escolha controle={controleJanela} musica={escolhendo} extra={config.prioridade.extra}
+          aoEscolher={(prioridade) => { setJanela(null); enfileirar(escolhendo, prioridade); }} aoFechar={() => setJanela(null)} />
+      )}
       {janela === 'menu' && <Menu controle={controleJanela} aoFechar={() => setJanela(null)} aviso={avisar} />}
       {janela === 'buscar' && <Busca controle={controleJanela} aoFechar={() => setJanela(null)} aviso={avisar} />}
     </main>

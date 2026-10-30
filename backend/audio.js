@@ -39,10 +39,12 @@ export function mpvSuportaIpc(comando) {
 
 // `ganho` (dB) é o ajuste do volume parelho desta faixa; fica num filtro à parte para o volume mestre
 // (que o painel muda ao vivo) continuar valendo por cima.
-export function argumentosMpv(arquivo, { volume = 100, ipc = null, ganho = 0 } = {}) {
+// duracao (segundos): para depois desse tempo, como a palhinha da aleatória. 0 = a música inteira.
+export function argumentosMpv(arquivo, { volume = 100, ipc = null, ganho = 0, duracao = 0 } = {}) {
   return [
     '--no-video', '--no-terminal', '--really-quiet', '--audio-display=no',
     `--volume=${volume}`,
+    ...(duracao > 0 ? [`--length=${duracao}`] : []),
     ...(ganho ? [`--af=lavfi=[volume=${ganho}dB]`] : []),
     ...(ipc ? [`--input-ipc-server=${ipc}`] : []),
     arquivo,
@@ -51,7 +53,8 @@ export function argumentosMpv(arquivo, { volume = 100, ipc = null, ganho = 0 } =
 
 // O VLC (interface "dummy") não aceita comando em execução: o volume vale a partir da próxima faixa.
 // O ganho em dB vira fator linear junto com o volume mestre (o --gain do VLC vai de 0 a 8).
-export function argumentosVlc(arquivo, { volume = 100, ganho = 0 } = {}) {
+export function argumentosVlc(arquivo, { volume = 100, ganho = 0, duracao = 0 } = {}) {
   const linear = Math.min(8, (volume / 100) * 10 ** (ganho / 20));
-  return ['--intf', 'dummy', '--no-video', '--play-and-exit', '--quiet', `--gain=${linear.toFixed(2)}`, arquivo];
+  return ['--intf', 'dummy', '--no-video', '--play-and-exit', '--quiet', `--gain=${linear.toFixed(2)}`,
+    ...(duracao > 0 ? [`--stop-time=${duracao}`] : []), arquivo];
 }

@@ -11,6 +11,9 @@ const PADROES = {
   automatico_so_top: '1', // sorteia entre as mais tocadas da casa (sem histórico ainda: o acervo todo)
   automatico_volume: '80', // % do volume mestre na aleatória: mais baixa que a paga, para o cliente querer a dele
   automatico_vinheta: '1', // toca uma vinheta (se houver) antes de cada aleatória: "coloque créditos e escolha"
+  automatico_trecho_seg: '0', // palhinha: a aleatória toca só este tanto de segundos (0 = a música inteira)
+  sorteio_a_cada: '0', // sorteio de crédito: em média 1 a cada N músicas pagas ganha 1 crédito (0 = desligado)
+  limite_30min: '100', // no máximo este tanto de reais em Pix/cartão a cada 30 minutos na máquina (0 = sem limite)
   automatico_categorias: '[]', // categorias sorteadas ([] = todas)
   automatico_agenda: '[]', // [{ inicio, fim, categorias }]: por horário, a primeira janela que casa vale
   vendas_abertas: '1', // chave manual: desligado, não gera Pix novo (quem já tem crédito continua usando)
@@ -36,7 +39,7 @@ const PADROES = {
   cartazes_ativo: '0', // cartazes girando no monitor
   cartazes_intervalo: '90', // segundos entre um cartaz e o próximo
   normalizacao: '{"ativa":false,"alvo":null}', // volume parelho; alvo null = automático (mediana do acervo)
-  alertas: '{"player":true,"pix":true,"disco":true,"backup":true,"inicio":false,"youtube":true}', // avisos no Telegram
+  alertas: '{"player":true,"pix":true,"disco":true,"backup":true,"inicio":false,"youtube":true,"credito":true}', // avisos no Telegram
   fechamento: '{"ativo":false,"hora":"06:00","boate":false}', // fechamento diário no Telegram
   fechamento_ultimo: '', // dia (AAAA-MM-DD) do último fechamento enviado
   youtube_ativo: '0', // o cliente pode pedir músicas da internet (baixadas pelo yt-dlp)
@@ -110,6 +113,7 @@ export const automaticoIntervaloMin = () => Math.min(120, Math.max(0, lerInt('au
 export const automaticoSoTop = () => lerBool('automatico_so_top');
 export const automaticoVolume = () => Math.min(100, Math.max(30, lerInt('automatico_volume') || 100));
 export const automaticoVinheta = () => lerBool('automatico_vinheta');
+export const automaticoTrechoSeg = () => Math.min(600, Math.max(0, lerInt('automatico_trecho_seg')));
 
 export const lerAutomatico = () => ({
   ativo: automaticoAtivo(),
@@ -118,12 +122,13 @@ export const lerAutomatico = () => ({
   so_top: automaticoSoTop(),
   volume: automaticoVolume(),
   vinheta: automaticoVinheta(),
+  trecho_seg: automaticoTrechoSeg(),
   categorias: lerJson('automatico_categorias'),
   agenda: lerJson('automatico_agenda'),
 });
 
 export function salvarAutomatico({
-  ativo, interrompe, intervalo_min: intervaloMin, so_top: soTop, volume, vinheta, categorias, agenda,
+  ativo, interrompe, intervalo_min: intervaloMin, so_top: soTop, volume, vinheta, trecho_seg: trechoSeg, categorias, agenda,
 } = {}) {
   const novos = {};
   if (ativo !== undefined) novos.automatico = ativo ? '1' : '0';
@@ -132,6 +137,7 @@ export function salvarAutomatico({
   if (soTop !== undefined) novos.automatico_so_top = soTop ? '1' : '0';
   if (volume !== undefined) novos.automatico_volume = inteiroEntre(volume, 30, 100, 'Volume da aleatória (%)');
   if (vinheta !== undefined) novos.automatico_vinheta = vinheta ? '1' : '0';
+  if (trechoSeg !== undefined) novos.automatico_trecho_seg = inteiroEntre(trechoSeg, 0, 600, 'Trecho da aleatória (segundos)');
   if (categorias !== undefined) novos.automatico_categorias = JSON.stringify(categoriasValidas(categorias, 'Categorias da playlist'));
   if (agenda !== undefined) {
     if (!Array.isArray(agenda) || agenda.length > 10) throw new ErroApi(400, 'A agenda aceita até 10 janelas de horário.');
@@ -312,7 +318,7 @@ export function salvarYoutube(entrada = {}) {
 
 // ---------- Avisos no Telegram ----------
 
-export const TIPOS_DE_ALERTA = ['player', 'pix', 'disco', 'backup', 'inicio', 'youtube'];
+export const TIPOS_DE_ALERTA = ['player', 'pix', 'disco', 'backup', 'inicio', 'youtube', 'credito'];
 
 // Quem salvou os ajustes antes de existir um tipo novo não tem a chave dele: vale o padrão do tipo.
 export function lerAlertas() {
@@ -361,6 +367,8 @@ export function lerRegras() {
     // `ativo` é o efetivo agora (chave ligada E dentro do horário); `habilitado` é só a chave do dono.
     bonus: { ativo: bonusAtivoAgora(), habilitado: lerBool('bonus_ativo'), agenda: lerJson('bonus_agenda'), faixas: lerJson('bonus_faixas') },
     precos: { lancamento: lerPrecoLancamento() },
+    sorteio: { a_cada: lerInt('sorteio_a_cada') },
+    limite_30min: lerInt('limite_30min'),
     recados: { ativo: recados.ativo, preco: recados.preco, max_caracteres: RECADO_MAX_CARACTERES, telao_online: telasConectadas() > 0 },
     // O cliente só vê a busca na internet se o dono ligou E o yt-dlp está funcionando neste computador.
     youtube: { ativo: internet.ativo && yt.pronto(), preco: internet.preco, max_min: internet.max_min },
@@ -426,6 +434,8 @@ export function salvarRegras(entrada = {}) {
   if (bonus.agenda !== undefined) novos.bonus_agenda = JSON.stringify(validarJanelasDeBonus(bonus.agenda));
   const precos = entrada.precos ?? {};
   if (precos.lancamento !== undefined) novos.preco_lancamento = inteiroEntre(precos.lancamento, 0, 20, 'Preço dos lançamentos');
+  if (entrada.sorteio?.a_cada !== undefined) novos.sorteio_a_cada = inteiroEntre(entrada.sorteio.a_cada, 0, 500, 'Sorteio (1 a cada quantas músicas)');
+  if (entrada.limite_30min !== undefined) novos.limite_30min = inteiroEntre(entrada.limite_30min, 0, 1000, 'Limite de Pix e cartão a cada 30 minutos');
   if (entrada.aviso !== undefined) {
     const aviso = String(entrada.aviso).replace(/\s+/g, ' ').trim();
     if (aviso.length > 140) throw new ErroApi(400, 'O aviso pode ter no máximo 140 caracteres.');

@@ -16,13 +16,13 @@ router.get('/:session_id', (req, res) => {
 
 router.post('/adicionar', (req, res) => {
   const { session_id: sessionId, musica_id: musicaId, prioridade } = req.body ?? {};
-  const { saldo } = adicionar(sessionId, musicaId, { prioridade: Boolean(prioridade) });
+  const { saldo, premio } = adicionar(sessionId, musicaId, { prioridade: Boolean(prioridade) });
 
   emitirTodos('fila');
   emitirSessao(sessionId, 'sessao', obterSessao(sessionId));
   acordar();
 
-  res.status(201).json({ sucesso: true, saldo });
+  res.status(201).json({ sucesso: true, saldo, premio });
 });
 
 export default router;

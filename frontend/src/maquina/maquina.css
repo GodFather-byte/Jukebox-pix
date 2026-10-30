@@ -259,6 +259,13 @@
 .pn-relogio-fechar { display: block; width: 100%; margin-top: 2vh; padding: 2vh !important; border-radius: 1.6vh; border: 1px solid rgba(255, 255, 255, 0.2) !important; background: rgba(255, 255, 255, 0.08); font-size: 2.4vh; font-weight: 900; }
 .pn-relogio-fechar.confirmar { background: linear-gradient(90deg, var(--rosa), var(--tema)); color: #fff; }
 
+.pn-escolha { width: min(80vw, 110vh); }
+.pn-escolha-opcoes { display: grid; grid-template-columns: 1fr 1fr; gap: 2vw; }
+.pn-escolha-opcoes button { display: flex; flex-direction: column; gap: 1vh; padding: 4vh 2vw !important; border-radius: 2vh; border: 1px solid rgba(255, 255, 255, 0.16) !important; background: rgba(255, 255, 255, 0.06); }
+.pn-escolha-opcoes b { font-size: 3.2vh; font-weight: 900; }
+.pn-escolha-opcoes small { font-size: 2vh; color: #c9c2ec; }
+.pn-escolha-opcoes button.ativo { background: linear-gradient(160deg, var(--rosa), var(--tema)); border-color: rgba(255, 255, 255, 0.5) !important; }
+
 /* ---------- Monitor em pé ---------- */
 @media (max-aspect-ratio: 1/1) {
   .pn { grid-template-rows: 11vh 5vh 30vh minmax(0, 1fr) 7vh; }

@@ -1,4 +1,5 @@
 import { config } from '../config.js';
+import * as alertas from './alertas.js';
 import { registrarNota } from './pagamentos.js';
 import { sessaoDoQuiosque } from './quiosque.js';
 
@@ -22,10 +23,27 @@ export const situacaoNoteiro = () => ({
   conectado: cfg.tipo === 'teclado' || estado.conectado, // a tecla chega pela tela: não há porta para cair
 });
 
+// Entradas dos últimos 10 minutos, para o alerta de dinheiro demais. Não bloqueia: nota aceita é dinheiro de
+// verdade e não volta, então o crédito entra e o dono é avisado para conferir.
+const JANELA_ALERTA_MS = 10 * 60_000;
+let recentes = [];
+
+function vigiar(valor) {
+  const agora = Date.now();
+  recentes = [...recentes.filter((e) => agora - e.em < JANELA_ALERTA_MS), { valor, em: agora }];
+  const total = recentes.reduce((soma, e) => soma + e.valor, 0);
+  if (config.creditoAlerta10Min > 0 && total > config.creditoAlerta10Min) {
+    console.warn(`[noteiro] R$ ${total} em 10 minutos: acima do normal`);
+    alertas.avisar('credito', `🚨 Entraram R$ ${total} em dinheiro nos últimos 10 minutos (o normal é até R$ ${config.creditoAlerta10Min}). Confira a máquina: alguém com um teclado ou a placa com defeito?`, { intervaloMin: 30 });
+    return true;
+  }
+  return false;
+}
+
 // Credita a nota na sessão do jukebox. Usado pela placa e pelo botão de teste.
 export function creditarNota(valor) {
   const pagamento = registrarNota(sessaoDoQuiosque().id, valor);
-  estado.ultima = { valor, em: new Date().toISOString() };
+  estado.ultima = { valor, em: new Date().toISOString(), suspeito: vigiar(valor) };
   return pagamento;
 }
 

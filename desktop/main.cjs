@@ -189,6 +189,12 @@ async function run() {
       }
       log(code === 0 ? 'ENCERRADO' : 'FALHA_ENCERRAMENTO');
       app.exit(exitCode);
+    } else if (mainWindow && !smoke) {
+      // Modo aparelho: o servidor caiu com a jukebox já atendendo. Reabre tudo sozinho em vez de mostrar erro
+      // (na boate não tem ninguém para clicar em OK). Falha na subida continua mostrando o aviso.
+      log('SERVIDOR_CAIU_REINICIANDO');
+      app.relaunch();
+      app.exit(0);
     } else fail(startupError || 'EXIT');
   });
   backend.on('message', async (info) => {
@@ -210,6 +216,18 @@ async function run() {
       if (!smoke) {
         mainWindow.maximize();
         if (!settings.test) mainWindow.setFullScreen(true);
+        // Modo aparelho: se a tela travar ou o processo dela morrer, recarrega sozinha.
+        mainWindow.webContents.on('render-process-gone', () => {
+          log('TELA_RECARREGADA');
+          setTimeout(() => { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.reload(); }, 1000);
+        });
+        // Travada por mais de 15 s (e não voltou sozinha): derruba a tela, e o aviso acima a recarrega.
+        let travada = null;
+        mainWindow.on('unresponsive', () => {
+          log('TELA_TRAVADA');
+          travada ??= setTimeout(() => { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.forcefullyCrashRenderer(); }, 15000);
+        });
+        mainWindow.on('responsive', () => { clearTimeout(travada); travada = null; });
       }
       log('PRONTO');
       if (smoke) {

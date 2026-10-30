@@ -111,6 +111,18 @@ export default function PlayerAdmin({ chamar, versao }) {
             onKeyUp={(e) => acao('/admin/automatico', { metodo: 'PUT', corpo: { volume: Number(e.currentTarget.value) } })} />
           <small>Mais baixa que a música paga: quem quer a dele no volume cheio, coloca créditos.</small>
         </label>
+        <label className="campo-rotulo">
+          Palhinha: quanto da aleatória toca
+          <select className="campo" value={estado.automatico.trecho_seg} disabled={!estado.automatico.ativo}
+            onChange={(e) => acao('/admin/automatico', { metodo: 'PUT', corpo: { trecho_seg: Number(e.target.value) } })}>
+            <option value={0}>A música inteira</option>
+            <option value={60}>1 minuto</option>
+            <option value={90}>1 minuto e meio</option>
+            <option value={120}>2 minutos</option>
+            <option value={180}>3 minutos</option>
+          </select>
+          <small>Só um trecho de graça: a tela mostra “coloque crédito e ouça inteira”.</small>
+        </label>
         <label className="interruptor" aria-disabled={!estado.automatico.ativo}>
           <input type="checkbox" checked={estado.automatico.vinheta} disabled={!estado.automatico.ativo}
             onChange={(e) => acao('/admin/automatico', { metodo: 'PUT', corpo: { vinheta: e.target.checked } })} />

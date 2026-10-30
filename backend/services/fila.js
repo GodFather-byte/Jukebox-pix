@@ -71,8 +71,17 @@ export const adicionar = db.transaction((sessionId, musicaId, { prioridade = fal
     VALUES (?, ?, ?, ?, ?, ?, ?, 'aguardando', ?)
   `).run(id, sessionId, musicaId, proxima, custo, gasto.cortesia, prioridade ? 1 : 0, agora());
 
-  return { id, saldo: obterSessao(sessionId).saldo };
+  // Sorteio de crédito: só música paga concorre; o prêmio é cortesia (não entra no faturamento).
+  const aCada = regras.sorteio.a_cada;
+  const premio = aCada > 0 && gasto.pago > 0 && sortear() < 1 / aCada ? 1 : 0;
+  if (premio) creditar(sessionId, 0, premio);
+
+  return { id, saldo: obterSessao(sessionId).saldo, premio };
 });
+
+let sortear = Math.random;
+// Só para os testes: troca o sorteio por um número fixo.
+export const definirSorteio = (funcao) => { sortear = funcao; };
 
 // Música da internet: o valor foi cobrado no pedido (antes do download), então aqui ela só entra na fila.
 // Os valores guardados valem para o reembolso, se ela for removida ou falhar.
@@ -97,6 +106,7 @@ function paraCliente(item, sessionId, esperaSegundos) {
     quem: rotulo(item.session_id),
     minha: item.session_id === sessionId,
     automatica: item.session_id === SESSAO_SISTEMA,
+    trecho_seg: item.session_id === SESSAO_SISTEMA ? configuracoes.automaticoTrechoSeg() : 0,
     casa: item.session_id === SESSAO_CASA,
     prioridade: Boolean(item.prioridade),
     musica: {

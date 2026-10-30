@@ -57,6 +57,8 @@ export const config = {
   filaMax: num('FILA_MAX', 60),
   divisaoUsuario: num('DIVISAO_USUARIO', 50), // % do usuário; o resto vai pra boate
   creditosDonoMax: num('CREDITOS_DONO_MAX', 50), // teto do crédito de cortesia (1 vez por dia)
+  // Avisa no Telegram se entrar mais que isto (R$) pelo noteiro/moedeiro/chave em 10 minutos. 0 = não avisa.
+  creditoAlerta10Min: num('CREDITO_ALERTA_10MIN', 150),
 
   pagamento: {
     provedor: env.PAYMENT_PROVIDER || 'mock',
