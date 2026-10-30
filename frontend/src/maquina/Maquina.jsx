@@ -4,26 +4,27 @@ import Progresso from '../components/Progresso.jsx';
 import { api, formatarDuracao } from '../api.js';
 import { SessaoProvider, useSessao } from '../context/Sessao.jsx';
 import { useAgora, useApi, useManterAceso } from '../hooks.js';
-import Internet from './Internet.jsx';
+import Busca from './Busca.jsx';
+import Menu from './Menu.jsx';
 import Pagamento from './Pagamento.jsx';
-import { botaoDaTecla } from './teclas.js';
+import { botaoDaTecla, ehTeclaDeCredito } from './teclas.js';
 import './maquina.css';
 
 const FAIXAS_VISIVEIS = 10;
 const LADO = 3; // capas de cada lado do carrossel
 const TODOS = { id: 'todos', nome: 'TODOS', icone: '★' };
-const INTERNET = { id: 'internet', nome: 'INTERNET', icone: '🌐' };
+const BUSCAR = { id: 'buscar', nome: 'BUSCAR', icone: '🔎' };
 
 const numero = (n) => String(n).padStart(3, '0');
 const circular = (i, total) => ((i % total) + total) % total;
 
 // Carrossel de capas em 3D: a do meio é o CD escolhido, as dos lados giram para trás.
-function Carrossel({ cds, indice, aoEscolher, internet }) {
-  if (internet) {
+function Carrossel({ cds, indice, aoEscolher, busca }) {
+  if (busca) {
     return (
       <div className="pn-carrossel">
         <button type="button" className="pn-capa pn-capa-internet" style={{ '--d': 0 }} onClick={aoEscolher}>
-          <span>🌐</span><b>BUSCAR NA INTERNET</b><small>TOCAR para pesquisar</small>
+          <span>🔎</span><b>BUSCAR MÚSICA</b><small>TOCAR para pesquisar</small>
         </button>
       </div>
     );
@@ -96,7 +97,7 @@ function Tela() {
   const [cdIdx, setCdIdx] = useState(0);
   const [faixaIdx, setFaixaIdx] = useState(0);
   const [faixas, setFaixas] = useState({});
-  const [janela, setJanela] = useState(null); // null | 'creditos' | 'internet'
+  const [janela, setJanela] = useState(null); // null | 'creditos' | 'buscar' | 'menu'
   const [aviso, setAviso] = useState(null);
   const controleJanela = useRef(null);
   const faixaRitmos = useRef(null);
@@ -107,15 +108,15 @@ function Tela() {
     const vistos = new Map();
     for (const cd of todos) if (!vistos.has(cd.categoria_id)) vistos.set(cd.categoria_id, { id: cd.categoria_id, nome: cd.categoria.toUpperCase(), icone: cd.icone, cor: cd.cor });
     const novos = todos.some((cd) => cd.status === 'novo') ? [{ id: 'novos', nome: 'LANÇAMENTOS', icone: '✦' }] : [];
-    return [TODOS, ...novos, ...vistos.values(), ...(config.youtube.ativo ? [INTERNET] : [])];
-  }, [todos, config.youtube.ativo]);
+    return [TODOS, ...novos, ...vistos.values(), BUSCAR];
+  }, [todos]);
   const ritmoIdx = Math.max(0, ritmos.findIndex((r) => r.id === ritmoId));
   const ritmo = ritmos[ritmoIdx] ?? TODOS;
-  const noInternet = ritmo.id === 'internet';
+  const naBusca = ritmo.id === 'buscar';
   const cds = useMemo(() => (ritmo.id === 'todos' ? todos
     : ritmo.id === 'novos' ? todos.filter((cd) => cd.status === 'novo')
       : todos.filter((cd) => cd.categoria_id === ritmo.id)), [todos, ritmo.id]);
-  const cd = !noInternet && cds.length ? cds[circular(cdIdx, cds.length)] : null;
+  const cd = !naBusca && cds.length ? cds[circular(cdIdx, cds.length)] : null;
   const musicas = cd ? faixas[cd.id] : null;
 
   useEffect(() => {
@@ -173,6 +174,7 @@ function Tela() {
   }, [adicionarMusica, avisar]);
 
   const apertar = useCallback((botao) => {
+    if (botao === 'menu' && janela !== 'menu') { setJanela('menu'); return undefined; } // o operador abre de qualquer tela
     if (janela) return controleJanela.current?.(botao);
     const total = musicas?.length ?? 0;
     if (botao === 'ritmo') mudarRitmo(1);
@@ -181,13 +183,13 @@ function Tela() {
     if (botao === 'descer' && total) setFaixaIdx((i) => (i + 1) % total);
     if (botao === 'subir' && total) setFaixaIdx((i) => (i - 1 + total) % total);
     if (botao === 'tocar') {
-      if (noInternet) setJanela('internet');
+      if (naBusca) setJanela('buscar');
       else if (total) tocar(musicas[Math.min(faixaIdx, total - 1)]);
     }
     if (botao === 'creditos') setJanela('creditos');
-    if (botao === 'internet' && config.youtube.ativo) setJanela('internet');
+    if (botao === 'buscar') setJanela('buscar');
     return undefined;
-  }, [janela, musicas, faixaIdx, noInternet, config.youtube.ativo, mudarRitmo, mudarCd, tocar]);
+  }, [janela, musicas, faixaIdx, naBusca, mudarRitmo, mudarCd, tocar]);
 
   useEffect(() => {
     const aoTecla = (e) => {
@@ -199,6 +201,20 @@ function Tela() {
     window.addEventListener('keydown', aoTecla);
     return () => window.removeEventListener('keydown', aoTecla);
   }, [apertar]);
+
+  // Pulso de crédito da placa da máquina (noteiro, moedeiro, chave de créditos). Na captura, antes de qualquer
+  // janela: nem a busca da internet pode engolir a tecla. Uma nova tentativa se o servidor piscar.
+  useEffect(() => {
+    const aoPulso = (e) => {
+      if (!ehTeclaDeCredito(e)) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      if (e.repeat) return;
+      api('/quiosque/pulso', { metodo: 'POST' }).catch(() => setTimeout(() => api('/quiosque/pulso', { metodo: 'POST' }).catch(() => {}), 500));
+    };
+    window.addEventListener('keydown', aoPulso, true);
+    return () => window.removeEventListener('keydown', aoPulso, true);
+  }, []);
 
   if (!sessao || !lista.dados) {
     return (
@@ -227,7 +243,7 @@ function Tela() {
         ))}
       </nav>
 
-      <Carrossel cds={cds} indice={cdIdx} internet={noInternet} aoEscolher={(d) => (noInternet ? setJanela('internet') : mudarCd(d))} />
+      <Carrossel cds={cds} indice={cdIdx} busca={naBusca} aoEscolher={(d) => (naBusca ? setJanela('buscar') : mudarCd(d))} />
 
       <section className="pn-disco">
         {cd && (
@@ -238,7 +254,7 @@ function Tela() {
           </div>
         )}
         <ol className="pn-faixas" style={{ '--linhas': Math.ceil(Math.min(FAIXAS_VISIVEIS, musicas?.length ?? 0) / 2) }}>
-          {noInternet && <li className="pn-vazio">Não achou no acervo? Aperte TOCAR, escreva o nome e a música vem da internet com capa.</li>}
+          {naBusca && <li className="pn-vazio">Aperte TOCAR e escreva o nome da música ou do artista: procura em todos os CDs da casa{config.youtube.ativo ? ' e, se não achar, na internet' : ''}.</li>}
           {cd && !musicas && <li className="pn-vazio">Carregando…</li>}
           {musicas?.slice(inicio, inicio + FAIXAS_VISIVEIS).map((m, i) => {
             const n = inicio + i;
@@ -264,14 +280,15 @@ function Tela() {
         <button type="button" onClick={() => apertar('anterior')}><kbd>◀</kbd>CD anterior</button>
         <button type="button" onClick={() => apertar('descer')}><kbd>▼</kbd>Faixa</button>
         <button type="button" onClick={() => apertar('proxima')}><kbd>▶</kbd>Próximo CD</button>
-        <button type="button" className="tocar" onClick={() => apertar('tocar')}><kbd>TOCAR</kbd>{noInternet ? 'Buscar' : 'Pôr na fila'}</button>
-        {config.youtube.ativo && <button type="button" onClick={() => setJanela('internet')}><kbd>🌐</kbd>Internet</button>}
+        <button type="button" className="tocar" onClick={() => apertar('tocar')}><kbd>TOCAR</kbd>{naBusca ? 'Buscar' : 'Pôr na fila'}</button>
+        <button type="button" onClick={() => setJanela('buscar')}><kbd>🔎</kbd>Buscar</button>
         <button type="button" className="creditos" onClick={() => setJanela('creditos')}><kbd>$</kbd>Créditos</button>
       </footer>
 
       {aviso && <div className={`pn-aviso ${aviso.tipo}`} key={aviso.id} role="status">{aviso.texto}</div>}
       {janela === 'creditos' && <Pagamento controle={controleJanela} aoFechar={() => setJanela(null)} />}
-      {janela === 'internet' && <Internet controle={controleJanela} aoFechar={() => setJanela(null)} aviso={avisar} />}
+      {janela === 'menu' && <Menu controle={controleJanela} aoFechar={() => setJanela(null)} aviso={avisar} />}
+      {janela === 'buscar' && <Busca controle={controleJanela} aoFechar={() => setJanela(null)} aviso={avisar} />}
     </main>
   );
 }

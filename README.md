@@ -40,17 +40,19 @@ Ao abrir, o aplicativo mostra a **tela da jukebox** ("palco neon"):
 | ↓ / ↑ | `↓` / `↑` | anda na lista de faixas |
 | TOCAR | `Enter`, `Espaço` | põe a faixa escolhida na fila |
 | CRÉDITOS | `Insert`, `F2` | abre a tela de créditos |
-| INTERNET | `F3` | abre a busca no YouTube |
+| BUSCAR | `F3` | busca pelo nome no acervo (e na internet, se ligada) |
+| MENU | `F10` | menu do operador: relógio (total e parcial) e fechamento do caixa |
 | VOLTAR | `Esc`, `End` | fecha a janela aberta |
 
 Com **toque**: toque numa capa para escolher o CD, numa faixa para escolher e de novo para tocar, num ritmo para trocar de gênero.
 
 **Sem crédito:** o TOCAR abre a tela de créditos (Dinheiro, Pix, Cartão débito ou crédito). Ela usa os mesmos botões: ↓ escolhe, ◀ ▶ muda o valor, TOCAR confirma e RITMO volta.
 
-**Músicas da internet** (YouTube), quando o dono liga na aba *Internet* do painel:
-1. Escolha o ritmo **Internet** (ou aperte `F3`) e TOCAR.
-2. Escreva o nome no teclado da tela: ◀ ▶ ▼ escolhem a tecla e TOCAR aperta. Um teclado de verdade também funciona.
-3. Escolha o resultado e aperte TOCAR duas vezes para confirmar.
+**Buscar pelo nome** (acervo da casa e, se ligada, internet):
+1. Escolha o ritmo **Buscar** (ou aperte `F3`) e TOCAR.
+2. Escreva o nome da música, do artista ou do CD no teclado da tela: ◀ ▶ ▼ escolhem a tecla e TOCAR aperta. Um teclado de verdade também funciona.
+3. Aparecem as músicas do acervo; TOCAR põe na fila. Não achou? A última linha, **Buscar na internet**, leva a mesma
+   busca ao YouTube (quando o dono liga na aba *Internet* do painel): escolha o resultado e aperte TOCAR duas vezes.
 4. A música e a capa são baixadas e a música entra na fila sozinha. Se o download falhar, o crédito volta.
 
 No menu **Jukebox Pix** há **Tela do jukebox**, **Painel administrativo** (outra janela, para não tirar o cliente da tela), **Abrir telão (2º monitor)** (`/telao`), **Configurações…**, **Abrir pasta de dados e logs**, **Editar configuração avançada (.env)**, **Sobre a configuração** e **Sair**. O menu **Exibir** oferece **Recarregar** e **Tela cheia**. Alterações de configuração valem na próxima abertura; feche o aplicativo antes de editar ou migrar dados.

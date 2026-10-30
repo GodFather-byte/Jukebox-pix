@@ -1,8 +1,9 @@
 import { Router } from 'express';
 import { config } from '../config.js';
 import { ErroApi } from '../erros.js';
-import { creditarNota, situacaoNoteiro } from '../services/noteiro.js';
+import { creditarNota, pulsoDeTeclado, situacaoNoteiro } from '../services/noteiro.js';
 import { sessaoDoQuiosque } from '../services/quiosque.js';
+import { fecharRelogio, lerRelogio } from '../services/relogio.js';
 
 const router = Router();
 
@@ -19,7 +20,24 @@ router.get('/', (req, res) => {
       nota: teste || noteiro.ativo,
     },
     noteiro: { ativo: noteiro.ativo, conectado: noteiro.conectado },
+    teclado: { perfil: config.tecladoPerfil, tecla_credito: config.noteiro.tipo === 'teclado' ? config.noteiro.tecla : null },
   });
+});
+
+// A placa da máquina mandou a tecla de crédito (um pulso do noteiro, moedeiro ou chave de créditos).
+// Só existe com NOTEIRO=teclado; o servidor só atende o próprio computador.
+router.post('/pulso', (req, res) => {
+  if (!pulsoDeTeclado()) throw new ErroApi(404, 'Rota não encontrada');
+  res.status(202).json({ ok: true });
+});
+
+// Menu do operador (botão de dentro da máquina): relógio total/parcial e fechamento do caixa.
+router.get('/relogio', (req, res) => {
+  res.json(lerRelogio());
+});
+
+router.post('/relogio/fechar', (req, res) => {
+  res.json(fecharRelogio());
 });
 
 // Só no modo teste: simula uma nota entrando no noteiro.

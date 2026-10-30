@@ -19,6 +19,27 @@ NOTEIRO_BAUD=9600            # velocidade da placa (padrão 9600)
 NOTEIRO_REAIS_POR_PULSO=1    # só para o modo de pulsos (abaixo)
 ```
 
+## Máquina que veio da JukeLinux (sem placa nova)
+
+Nas jukeboxes JukeLinux os botões, o noteiro, o moedeiro e a chave de créditos já passam por uma placa que imita
+um teclado: cada pulso de crédito vira a tecla **U**. Na tela de configuração escolha **Placa de botões da máquina →
+JukeLinux**. Isso grava `TECLADO_PERFIL=jukelinux` e `NOTEIRO=teclado` no `.env`:
+
+| Botão da máquina | Tecla | No Jukebox Pix |
+|---|---|---|
+| Crédito (noteiro, moedeiro, chave) | U | +R$ 1 por pulso (`NOTEIRO_REAIS_POR_PULSO`) |
+| CD+ / CD- | ↑ / ↓ | Próximo / anterior CD |
+| Música+ / Música- | D / → | Próxima / anterior faixa |
+| Ritmo | R | Troca o ritmo |
+| Tocar | Enter | Põe na fila |
+| Cancelar | * (numérico) | Voltar |
+| Menu | / (numérico) | Menu do operador: relógio total/parcial, divisão com o ponto e fechamento do caixa |
+
+O cliente chega à tela de créditos (Pix e cartão) apertando TOCAR sem saldo.
+
+Pulsos seguidos (até 600 ms entre eles) viram um crédito só na tela: R$ 20 aparecem como "+20".
+Outra tecla de crédito: `NOTEIRO_TECLA` com o código da tecla (ex.: `KeyC`).
+
 ## O que a placa precisa mandar
 
 Uma linha de texto por evento, terminada em quebra de linha (`\n`):

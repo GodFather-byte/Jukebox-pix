@@ -237,11 +237,27 @@
   padding: 1vh 1.4vw; border-radius: 1.6vh; border: 1px solid rgba(255, 255, 255, 0.1); background: rgba(255, 255, 255, 0.04);
 }
 .pn-resultados img { width: 16vh; height: 9vh; object-fit: cover; border-radius: 1vh; }
+.pn-resultados .pn-res-capa { width: 9vh; height: 9vh; justify-self: center; border-radius: 1vh; object-fit: cover; }
+.pn-res-icone { display: grid; place-items: center; font-size: 4.4vh; }
+.pn-res-internet { border-style: dashed !important; }
 .pn-res-texto { display: flex; flex-direction: column; min-width: 0; }
 .pn-res-texto b { font-size: 2.3vh; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pn-res-texto small { font-size: 1.7vh; color: #c9c2ec; }
 .pn-res-preco { padding: 0.8vh 1.4vh; border-radius: 99px; background: rgba(255, 197, 49, 0.18); color: var(--ouro); font-size: 1.8vh; font-weight: 900; }
 .pn-resultados button.ativo { background: linear-gradient(90deg, color-mix(in srgb, var(--rosa) 55%, transparent), color-mix(in srgb, var(--tema) 35%, transparent)); border-color: rgba(255, 255, 255, 0.4); }
+
+.pn-relogio { width: min(94vw, 150vh); }
+.pn-relogio-colunas { display: grid; grid-template-columns: 1fr 1fr; gap: 2vw; }
+.pn-relogio-coluna { padding: 2vh 2vw; border-radius: 2vh; border: 1px solid rgba(255, 255, 255, 0.14); background: rgba(255, 255, 255, 0.05); display: flex; flex-direction: column; gap: 0.6vh; }
+.pn-relogio-coluna h2 { text-align: left !important; font-size: 2.6vh !important; color: var(--ciano); }
+.pn-relogio-coluna small { color: #a59fd0; font-size: 1.7vh; }
+.pn-relogio-coluna strong { font-size: 5vh; font-weight: 900; color: var(--ouro); }
+.pn-relogio-coluna ul { list-style: none; margin: 0.6vh 0 0; padding: 0; display: flex; flex-direction: column; gap: 0.6vh; font-size: 2.1vh; }
+.pn-relogio-coluna li { display: flex; justify-content: space-between; gap: 1vw; padding-bottom: 0.5vh; border-bottom: 1px solid rgba(255, 255, 255, 0.07); }
+.pn-relogio-coluna li.destaque b { color: var(--ciano); }
+.pn-relogio-ultimo { margin-top: 2vh !important; font-size: 1.9vh !important; }
+.pn-relogio-fechar { display: block; width: 100%; margin-top: 2vh; padding: 2vh !important; border-radius: 1.6vh; border: 1px solid rgba(255, 255, 255, 0.2) !important; background: rgba(255, 255, 255, 0.08); font-size: 2.4vh; font-weight: 900; }
+.pn-relogio-fechar.confirmar { background: linear-gradient(90deg, var(--rosa), var(--tema)); color: #fff; }
 
 /* ---------- Monitor em pé ---------- */
 @media (max-aspect-ratio: 1/1) {
