@@ -6,7 +6,7 @@ import { SessaoProvider, useSessao } from '../context/Sessao.jsx';
 import { useAgora, useApi, useManterAceso } from '../hooks.js';
 import Internet from './Internet.jsx';
 import Pagamento from './Pagamento.jsx';
-import { botaoDaTecla } from './teclas.js';
+import { botaoDaTecla, ehTeclaDeCredito } from './teclas.js';
 import './maquina.css';
 
 const FAIXAS_VISIVEIS = 10;
@@ -199,6 +199,20 @@ function Tela() {
     window.addEventListener('keydown', aoTecla);
     return () => window.removeEventListener('keydown', aoTecla);
   }, [apertar]);
+
+  // Pulso de crédito da placa da máquina (noteiro, moedeiro, chave de créditos). Na captura, antes de qualquer
+  // janela: nem a busca da internet pode engolir a tecla. Uma nova tentativa se o servidor piscar.
+  useEffect(() => {
+    const aoPulso = (e) => {
+      if (!ehTeclaDeCredito(e)) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      if (e.repeat) return;
+      api('/quiosque/pulso', { metodo: 'POST' }).catch(() => setTimeout(() => api('/quiosque/pulso', { metodo: 'POST' }).catch(() => {}), 500));
+    };
+    window.addEventListener('keydown', aoPulso, true);
+    return () => window.removeEventListener('keydown', aoPulso, true);
+  }, []);
 
   if (!sessao || !lista.dados) {
     return (

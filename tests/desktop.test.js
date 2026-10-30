@@ -212,3 +212,19 @@ test('pasta de músicas de outra jukebox: a tela grava o caminho completo no .en
   salvarConfiguracao(dir, { ...base, acervoExterno: '' });
   assert.equal(lerConfiguracao(dir).acervoExterno, '');
 });
+
+test('placa de botões JukeLinux: perfil vai para o .env e, sem noteiro na serial, o crédito vem pela tecla', (t) => {
+  const dir = directory(t);
+  const base = { modo: 'teste', senha: 'senha-bem-forte', porta: 3000 };
+  assert.equal(lerConfiguracao(dir).tecladoPerfil, 'padrao');
+  salvarConfiguracao(dir, { ...base, tecladoPerfil: 'jukelinux' });
+  let { env } = readSettings(dir, {});
+  assert.deepEqual([env.TECLADO_PERFIL, env.NOTEIRO], ['jukelinux', 'teclado']);
+  assert.equal(lerConfiguracao(dir).tecladoPerfil, 'jukelinux');
+  salvarConfiguracao(dir, { ...base, tecladoPerfil: 'jukelinux', noteiroPorta: '/dev/ttyUSB0' });
+  ({ env } = readSettings(dir, {}));
+  assert.equal(env.NOTEIRO, 'serial', 'noteiro na serial vale mais que a tecla');
+  salvarConfiguracao(dir, { ...base, tecladoPerfil: 'padrao' });
+  ({ env } = readSettings(dir, {}));
+  assert.deepEqual([env.TECLADO_PERFIL, env.NOTEIRO], ['padrao', 'desligado']);
+});

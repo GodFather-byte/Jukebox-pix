@@ -86,12 +86,16 @@ export const config = {
 
   // Noteiro (aceitador de notas). "serial": uma placa (Arduino ou interface do noteiro) manda pela porta serial
   // uma linha por nota com o valor em reais ("10") ou uma linha "P" por pulso. Veja docs/NOTEIRO.md.
+  // "teclado": a placa da máquina transforma cada pulso numa tecla (NOTEIRO_TECLA), como nas jukeboxes JukeLinux.
   noteiro: {
-    tipo: env.NOTEIRO || 'desligado', // desligado | serial
+    tipo: ['serial', 'teclado'].includes(env.NOTEIRO) ? env.NOTEIRO : 'desligado',
+    tecla: env.NOTEIRO_TECLA || 'KeyU', // código da tecla (KeyboardEvent.code) que vale um pulso
     porta: env.NOTEIRO_PORTA || '', // ex.: COM3 (Windows) ou /dev/ttyUSB0 (Linux)
     baud: num('NOTEIRO_BAUD', 9600),
     reaisPorPulso: num('NOTEIRO_REAIS_POR_PULSO', 1),
   },
+  // Botões físicos: "padrao" (teclas de docs/NOTEIRO.md) ou "jukelinux" (a placa de botões das jukeboxes JukeLinux).
+  tecladoPerfil: env.TECLADO_PERFIL === 'jukelinux' ? 'jukelinux' : 'padrao',
 
   // Medição de volume das músicas (volume parelho). Sem o ffmpeg só valem as tags ReplayGain dos arquivos.
   ffmpeg: env.FFMPEG_PATH || 'ffmpeg',

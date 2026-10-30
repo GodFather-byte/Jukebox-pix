@@ -16,7 +16,11 @@ let pulsos = 0;
 let relogioPulsos = null;
 let encerrando = false;
 
-export const situacaoNoteiro = () => ({ ...estado, ativo: cfg.tipo !== 'desligado' });
+export const situacaoNoteiro = () => ({
+  ...estado,
+  ativo: cfg.tipo !== 'desligado',
+  conectado: cfg.tipo === 'teclado' || estado.conectado, // a tecla chega pela tela: não há porta para cair
+});
 
 // Credita a nota na sessão do jukebox. Usado pela placa e pelo botão de teste.
 export function creditarNota(valor) {
@@ -38,6 +42,12 @@ function creditarSeguro(valor) {
   } catch (erro) {
     console.error(`[noteiro] não foi possível creditar R$ ${valor}: ${erro.message}`);
   }
+}
+
+// Um pulso que chegou como tecla na tela do jukebox (NOTEIRO=teclado). Agrupa igual aos pulsos da serial.
+export function pulsoDeTeclado() {
+  if (cfg.tipo !== 'teclado') return null;
+  return lerLinha('P');
 }
 
 // Interpreta uma linha da placa. Exportada para os testes.
@@ -82,7 +92,7 @@ async function conectar() {
 }
 
 export function iniciarNoteiro() {
-  if (cfg.tipo === 'desligado') return;
+  if (cfg.tipo === 'desligado' || cfg.tipo === 'teclado') return; // teclado: os pulsos chegam por /api/quiosque/pulso
   if (cfg.tipo !== 'serial' || !cfg.porta) {
     estado.erro = 'Configure NOTEIRO=serial e NOTEIRO_PORTA (ex.: COM3).';
     console.warn(`[noteiro] ${estado.erro}`);

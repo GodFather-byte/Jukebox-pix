@@ -1,5 +1,5 @@
 # Handoff
-Atualizado por: Claude Code em 2026-10-30 (branch `claude/vibrant-faraday-etr6xs`, recriada da `main`)
+Atualizado por: Claude Code em 2026-10-30 (branch `claude/vibrant-faraday-etr6xs`, recriada da `main` após o PR #12)
 
 ## Objetivo atual
 Jukebox de bar no computador da máquina: música por créditos, Pix, Point, noteiro, busca YouTube e tela por
@@ -31,8 +31,13 @@ toque/botões físicos. Próxima meta do dono: **piloto na boate**.
   (`criarCd({ manterNoLugar })`), só a capa é copiada. O player aceita arquivos dessa pasta (`resolverArquivo`) e
   apagar o CD nunca apaga arquivo fora de `musicasDir`. A importação normal (pasta `_importar`) continua MOVENDO.
 - SO recomendado nas máquinas: Linux Mint 22 XFCE no SSD (o Linux da JukeLinux é de 2013, não roda o Electron).
-- Falta para o piloto nessas máquinas: ler o crédito do moedeiro/noteiro/chave de 20 deles (aguardando diagnóstico),
-  modo aparelho + instalador por pendrive, tocar clipes, importar histórico de `tocados.txt`, fechamento com % do ponto.
+- Perfil de teclado JukeLinux (`TECLADO_PERFIL=jukelinux`, `NOTEIRO=teclado`): a placa deles manda cada pulso de
+  crédito como tecla U e os botões como teclas (tabela em `docs/NOTEIRO.md`, vinda do `interfaceteclado.txt` da máquina).
+  Tela: `frontend/src/maquina/teclas.js` (`definirTeclado`, `ehTeclaDeCredito`); captura em `Maquina.jsx` manda
+  `POST /api/quiosque/pulso`, que agrupa como os pulsos da serial (`pulsoDeTeclado` em `backend/services/noteiro.js`).
+  A máquina analisada não tem touchscreen: tudo pelos botões (Menu / abre a tela de créditos).
+- Falta para o piloto nessas máquinas: modo aparelho + instalador por pendrive, tocar clipes (vão para a TV),
+  importar histórico de `tocados.txt`, fechamento com % do ponto (eles usam 50%).
 
 ## Próximos passos
 1. Dono testar o instalador do CI (Actions → Desktop → Artifacts) no computador da boate, primeiro em

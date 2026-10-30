@@ -204,3 +204,27 @@ test('aleatória: sorteia entre as mais tocadas, sem repetir a recente; padrões
     soTop: true, semRepetir: true, padroes: { so_top: true, volume: 80, vinheta: true, intervalo: 5 }, recusou: true,
   });
 });
+
+test('placa JukeLinux: 20 teclas de crédito seguidas viram R$ 20 de uma vez; sem NOTEIRO=teclado não credita', { timeout: 30_000 }, (t) => {
+  const codigo = `
+    const { pulsoDeTeclado, situacaoNoteiro } = await import('./backend/services/noteiro.js');
+    const { sessaoDoQuiosque } = await import('./backend/services/quiosque.js');
+    const { config } = await import('./backend/config.js');
+    const { db } = await import('./backend/database.js');
+    const aceitos = [];
+    for (let i = 0; i < 20; i++) { aceitos.push(Boolean(pulsoDeTeclado())); await new Promise((r) => setTimeout(r, 140)); }
+    await new Promise((r) => setTimeout(r, 900));
+    const notas = db.prepare("SELECT valor FROM pagamentos WHERE metodo = 'nota'").all().map((p) => p.valor);
+    const s = situacaoNoteiro();
+    console.log(JSON.stringify({ aceitos: aceitos.filter(Boolean).length, saldo: sessaoDoQuiosque().saldo, notas,
+      ativo: s.ativo, conectado: s.conectado, perfil: config.tecladoPerfil, tecla: config.noteiro.tecla }));
+    db.close();
+  `;
+  const jukelinux = rodar(t, codigo, { NOTEIRO: 'teclado', TECLADO_PERFIL: 'jukelinux' });
+  assert.deepEqual(jukelinux, { aceitos: 20, saldo: 20, notas: [20], ativo: true, conectado: true, perfil: 'jukelinux', tecla: 'KeyU' });
+
+  const desligado = rodar(t, codigo, { NOTEIRO: 'desligado' });
+  assert.equal(desligado.aceitos, 0);
+  assert.equal(desligado.saldo, 0);
+  assert.equal(desligado.perfil, 'padrao');
+});

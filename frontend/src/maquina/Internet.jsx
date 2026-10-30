@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api, formatarDuracao } from '../api.js';
 import { useSessao } from '../context/Sessao.jsx';
+import { botaoDaTecla } from './teclas.js';
 
 // Teclado da busca. Com os botões da máquina: ◀ ▶ andam pelas teclas, ↓ ↑ trocam de linha, TOCAR aperta a tecla.
 const LINHAS = [
@@ -69,6 +70,7 @@ export default function Internet({ controle, aoFechar, aviso }) {
   useEffect(() => {
     if (fase !== 'digitar') return undefined;
     const aoTecla = (e) => {
+      if (botaoDaTecla(e) && e.key !== 'Backspace') return; // botão da máquina (ex.: D e R no perfil JukeLinux)
       if (e.key === 'Backspace') {
         e.stopImmediatePropagation();
         e.preventDefault();

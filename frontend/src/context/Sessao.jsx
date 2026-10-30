@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { api } from '../api.js';
+import { definirTeclado } from '../maquina/teclas.js';
 
 const SessaoContext = createContext(null);
 
@@ -45,6 +46,7 @@ export function SessaoProvider({ children }) {
       .then((q) => {
         if (!ativo) return;
         setSessao(q.sessao);
+        definirTeclado(q.teclado);
         setQuiosque({ metodos: q.metodos, modo_teste: q.modo_teste });
         setErroConexao(null);
       })
