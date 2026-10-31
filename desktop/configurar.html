@@ -48,6 +48,14 @@
         <small>O HD da máquina antiga ligado como segundo disco. As músicas tocam de lá, sem mover nem apagar nada.
           Depois importe pelo painel: Importar → Acervo de outra jukebox.</small>
       </label>
+      <label class="campo">Endereço da central (app de acompanhamento)
+        <input id="centralUrl" spellcheck="false" placeholder="https://minha-central.onrender.com">
+        <small>Opcional. A máquina manda um relatório a cada 6 horas e em cada fechamento do caixa.</small>
+      </label>
+      <label class="campo">Token da máquina
+        <input id="centralToken" type="password" spellcheck="false" placeholder="jbx_...">
+        <small>Aparece na central, em Cadastros, quando você cadastra esta máquina.</small>
+      </label>
       <label class="campo marcar">
         <input type="checkbox" id="iniciarComSistema">
         <span>Abrir o jukebox sozinho quando o computador ligar

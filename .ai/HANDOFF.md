@@ -52,8 +52,12 @@ toque/botões físicos. Próxima meta do dono: **piloto na boate**.
   confirmados), "tocar a seguir" na máquina (`Escolha.jsx`, quando a prioridade está ligada), alerta `credito`
   (`CREDITO_ALERTA_10MIN`, não bloqueia) e modo aparelho no desktop (servidor caído reabre o app; tela travada recarrega).
 - Guia de instalação para o dono: `docs/GUIA-INSTALACAO.md` (do SSD vazio ao teste final).
-- Próxima etapa aprovada: central na nuvem + app PWA (parceiro e pontos, relatório a cada 6 h), licença por máquina,
-  pacotes de músicas e atualização à distância. Repositório separado.
+- Central + app PWA prontos em `central/` (veja `docs/CENTRAL.md`): papéis dono/parceiro/ponto (o ponto não vê a
+  parte da empresa), máquina com token `jbx_…` (guardado só o hash), relatório = foto completa (relógio, 40 dias,
+  top) enviado por `backend/services/central.js` ao ligar (+1 min), a cada `CENTRAL_INTERVALO_H` e no fechamento.
+  `render.yaml` sobe a central (Starter + disco) e a demonstração (`CENTRAL_DEMO=1`, grátis).
+- Meta do dono: apresentar o piloto aos donos das máquinas na quarta 2026-11-04 (`docs/ROTEIRO-QUARTA.md`).
+- Depois: licença por máquina, pacotes de músicas e atualização à distância (dependem da central).
 
 ## Próximos passos
 1. Dono testar o instalador do CI (Actions → Desktop → Artifacts) no computador da boate, primeiro em

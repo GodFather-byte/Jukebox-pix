@@ -99,6 +99,13 @@ export const config = {
     baud: num('NOTEIRO_BAUD', 9600),
     reaisPorPulso: num('NOTEIRO_REAIS_POR_PULSO', 1),
   },
+  // Central na nuvem (app de acompanhamento): a máquina manda um relatório a cada CENTRAL_INTERVALO_H horas.
+  // O token é o que a central mostrou ao cadastrar a máquina. Sem os dois, nada é enviado.
+  central: {
+    url: env.CENTRAL_URL?.trim() || '',
+    token: env.CENTRAL_TOKEN?.trim() || '',
+    intervaloH: num('CENTRAL_INTERVALO_H', 6),
+  },
   // Botões físicos: "padrao" (teclas de docs/NOTEIRO.md) ou "jukelinux" (a placa de botões das jukeboxes JukeLinux).
   tecladoPerfil: env.TECLADO_PERFIL === 'jukelinux' ? 'jukelinux' : 'padrao',
 
@@ -133,6 +140,7 @@ config.valoresPix = [...new Set([config.valorMin, 10, 20, 30, 50, config.valorMa
 export function validarConfig() {
   if (!config.producao) return;
   const problemas = [];
+  if (config.central.url && !config.central.url.startsWith('https://')) problemas.push('CENTRAL_URL precisa começar com https:// (o token da máquina não pode viajar sem criptografia)');
   if (!(config.valorMin >= 1 && config.valorMax >= config.valorMin)) problemas.push('VALOR_MIN e VALOR_MAX: o mínimo precisa ser pelo menos 1 e não passar do máximo');
   if (config.pagamento.provedor === 'mock') problemas.push('PAYMENT_PROVIDER=mock libera créditos grátis; use um provedor real');
   if (config.admin.senha === 'admin') problemas.push('ADMIN_PASSWORD ainda é a senha padrão');

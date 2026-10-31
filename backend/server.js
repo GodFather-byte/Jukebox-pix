@@ -14,6 +14,7 @@ import { urlDoApp } from './rede.js';
 import { capasDir } from './services/biblioteca.js';
 import { cartazesDir } from './services/cartazes.js';
 import { encerrarNoteiro, iniciarNoteiro } from './services/noteiro.js';
+import { encerrarCentral, iniciarCentral } from './services/central.js';
 import { iniciarRecados } from './services/recados.js';
 import { iniciarSobDemanda } from './services/sobdemanda.js';
 import { agendarAnalise, encerrarTudo as encerrarVolume } from './services/volume.js';
@@ -123,6 +124,7 @@ export const servidor = app.listen(config.porta, config.host, (erro) => {
     iniciarBackups();
     iniciarRecados();
     iniciarNoteiro();
+    iniciarCentral();
     iniciarSobDemanda();
     iniciarVigia();
     agendarAnalise();
@@ -170,6 +172,7 @@ export function encerrar(codigo = 0) {
   const limite = setTimeout(finalizar, 3000);
   player.parar();
   encerrarNoteiro();
+  encerrarCentral();
   youtube.encerrarTudo();
   encerrarVolume();
   encerrarEventos();

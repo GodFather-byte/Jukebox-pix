@@ -4,6 +4,7 @@ import { config } from '../config.js';
 import { db } from '../database.js';
 import * as player from '../player.js';
 import { listarBackups, situacaoDaCopiaExtra } from './backup.js';
+import { situacaoCentral } from './central.js';
 import { provedorOnline } from './internet.js';
 
 const tamanhoDoArquivo = (caminho) => {
@@ -97,5 +98,6 @@ export async function diagnostico() {
     backups: listarBackups().slice(0, 5),
     pasta_backups: config.backupDir,
     backup_copia: situacaoDaCopiaExtra(),
+    central: situacaoCentral(),
   };
 }

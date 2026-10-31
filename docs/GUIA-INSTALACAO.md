@@ -148,6 +148,7 @@ Ela abre sozinha no primeiro uso. Depois, para mudar algo: aperte **Alt** (o men
 | **Nome do local** | O nome da boate (aparece no Pix, no menu do operador e nos avisos). Até 40 letras. |
 | **Senha do painel administrativo** | Já vem uma sugerida. **Anote**: é com ela que você entra no painel. Pelo menos 12 caracteres. Use **Copiar** e guarde no celular. |
 | **Pasta de músicas de outra jukebox** | `/mnt/jukelinux/home/jkb/musicas` (o caminho da [seção 4](#4-deixar-o-hd-da-jukelinux-como-disco-de-músicas)). Em máquina nova, sem HD antigo, deixe em branco. |
+| **Endereço da central** e **Token da máquina** | Para acompanhar pelo app no celular. O endereço vem do Render e o token de **⚙ Cadastros → Nova máquina** no app. Passo a passo em [CENTRAL.md](CENTRAL.md#3-ligar-uma-jukebox-à-central). Pode deixar em branco e preencher depois. |
 | **Abrir o jukebox sozinho quando o computador ligar** | ☑ Deixe marcado. |
 
 ### 3. Pix e cartão (só no modo Atender clientes)

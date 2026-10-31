@@ -68,7 +68,7 @@ function senhaAleatoria(tamanho = 14) {
 function lerConfiguracao(directory) {
   const file = path.join(directory, '.env');
   if (!fs.existsSync(file)) {
-    return { existe: false, modo: 'producao', nomeLocal: '', senha: senhaAleatoria(), porta: 3000, temToken: false, terminal: '', noteiroPorta: '', tecladoPerfil: 'padrao', acervoExterno: '', iniciarComSistema: true };
+    return { existe: false, modo: 'producao', nomeLocal: '', senha: senhaAleatoria(), porta: 3000, temToken: false, terminal: '', noteiroPorta: '', tecladoPerfil: 'padrao', acervoExterno: '', centralUrl: '', temTokenCentral: false, iniciarComSistema: true };
   }
   const values = dotenv.parse(fs.readFileSync(file));
   return {
@@ -82,6 +82,8 @@ function lerConfiguracao(directory) {
     noteiroPorta: values.NOTEIRO === 'serial' ? values.NOTEIRO_PORTA || '' : '',
     tecladoPerfil: values.TECLADO_PERFIL === 'jukelinux' ? 'jukelinux' : 'padrao',
     acervoExterno: values.ACERVO_EXTERNO_DIR || '',
+    centralUrl: values.CENTRAL_URL || '',
+    temTokenCentral: Boolean(values.CENTRAL_TOKEN?.trim()),
     iniciarComSistema: values.INICIAR_COM_SISTEMA === '1',
   };
 }
@@ -103,6 +105,10 @@ function salvarConfiguracao(directory, campos) {
   if (/\s/.test(terminal) || terminal.length > 120) throw new Error('Maquininha inválida.');
   if (noteiroPorta.length > 120) throw new Error('Porta do noteiro inválida.');
   const tecladoPerfil = campos.tecladoPerfil === 'jukelinux' ? 'jukelinux' : 'padrao';
+  const centralUrl = String(campos.centralUrl ?? '').trim().replace(/\/+$/, '');
+  const centralToken = String(campos.centralToken ?? '').trim();
+  if (centralUrl && !/^https:\/\/[^\s/]+(\/\S*)?$/.test(centralUrl)) throw new Error('Endereço da central: use o endereço completo com https:// (ex.: https://minha-central.onrender.com).');
+  if (/\s/.test(centralToken) || centralToken.length > 200) throw new Error('Token da máquina inválido.');
   const acervoExterno = String(campos.acervoExterno ?? '').trim();
   if (acervoExterno && (!path.isAbsolute(acervoExterno) || /[\r\n]/.test(acervoExterno))) {
     throw new Error('Pasta de músicas da outra jukebox: informe o caminho completo (ex.: /media/jukebox/HD/home/jkb/musicas).');
@@ -123,11 +129,13 @@ function salvarConfiguracao(directory, campos) {
     // Placa da JukeLinux sem noteiro na serial: o crédito chega como tecla (um pulso por tecla U).
     NOTEIRO: noteiroPorta ? 'serial' : tecladoPerfil === 'jukelinux' ? 'teclado' : 'desligado',
     TECLADO_PERFIL: tecladoPerfil,
+    CENTRAL_URL: centralUrl,
     NOTEIRO_PORTA: noteiroPorta,
     ACERVO_EXTERNO_DIR: acervoExterno,
     INICIAR_COM_SISTEMA: campos.iniciarComSistema ? '1' : '0',
   };
   if (token) valores.MERCADOPAGO_ACCESS_TOKEN = token;
+  if (centralToken) valores.CENTRAL_TOKEN = centralToken; // em branco mantém o que já estava
   // Rede, provedor e player só mudam junto com o modo: ajuste manual do dono (PLAYER=vlc, HOST=IP) fica.
   if (atuais.DESKTOP_MODE !== modo || !existia) {
     Object.assign(valores, modo === 'teste'
